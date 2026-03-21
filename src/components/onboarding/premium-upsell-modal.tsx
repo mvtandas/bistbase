@@ -7,9 +7,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Crown, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface PremiumUpsellModalProps {
   open: boolean;
@@ -49,12 +50,15 @@ export function PremiumUpsellModal({ open, onClose }: PremiumUpsellModalProps) {
         </div>
 
         <div className="flex flex-col gap-2 mt-6">
-          <Button
-            render={<Link href="/dashboard/upgrade" />}
-            className="w-full bg-ai-premium hover:bg-ai-premium/90 text-white"
+          <Link
+            href="/dashboard/upgrade"
+            className={cn(
+              buttonVariants(),
+              "w-full bg-ai-premium hover:bg-ai-premium/90 text-white"
+            )}
           >
             Premium&apos;a Yükselt
-          </Button>
+          </Link>
           <Button variant="ghost" onClick={onClose} className="w-full">
             Şimdilik Değil
           </Button>

@@ -9,8 +9,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StockChip } from "./stock-chip";
 import { PremiumUpsellModal } from "./premium-upsell-modal";
 import { useStockSearch } from "@/hooks/use-stock-search";
-import { Search, ArrowRight } from "lucide-react";
+import { Search, ArrowRight, TrendingUp } from "lucide-react";
 import type { StockSearchResult } from "@/types";
+
+const POPULAR_STOCKS: StockSearchResult[] = [
+  { code: "THYAO", name: "Türk Hava Yolları" },
+  { code: "SISE", name: "Şişecam" },
+  { code: "ASELS", name: "Aselsan" },
+  { code: "KCHOL", name: "Koç Holding" },
+  { code: "BIMAS", name: "BİM Mağazalar" },
+  { code: "TUPRS", name: "Tüpraş" },
+  { code: "SAHOL", name: "Sabancı Holding" },
+  { code: "EREGL", name: "Ereğli Demir Çelik" },
+  { code: "GARAN", name: "Garanti BBVA" },
+  { code: "AKBNK", name: "Akbank" },
+  { code: "YKBNK", name: "Yapı Kredi" },
+  { code: "FROTO", name: "Ford Otosan" },
+  { code: "TOASO", name: "Tofaş Oto" },
+  { code: "PGSUS", name: "Pegasus" },
+  { code: "EKGYO", name: "Emlak Konut GYO" },
+];
 
 interface SelectedStock {
   code: string;
@@ -24,6 +42,9 @@ export function StockSearch() {
   const [saving, setSaving] = useState(false);
   const { results, loading } = useStockSearch(query);
   const router = useRouter();
+
+  const showSearchResults = query.length >= 2 && (loading || results.length > 0);
+  const showPopular = query.length < 2;
 
   async function addStock(stock: StockSearchResult) {
     if (selected.some((s) => s.code === stock.code)) return;
@@ -70,6 +91,26 @@ export function StockSearch() {
     router.push("/dashboard");
   }
 
+  function StockListItem({ stock }: { stock: StockSearchResult }) {
+    const isSelected = selected.some((s) => s.code === stock.code);
+    return (
+      <button
+        type="button"
+        onClick={() => addStock(stock)}
+        disabled={isSelected}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-foreground">{stock.code}</span>
+          <span className="text-muted-foreground">{stock.name}</span>
+        </div>
+        {isSelected && (
+          <span className="text-xs text-ai-primary">Eklendi</span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <div className="w-full max-w-lg mx-auto space-y-6">
       {/* Selected stocks */}
@@ -99,7 +140,7 @@ export function StockSearch() {
       </div>
 
       {/* Search results */}
-      {(loading || results.length > 0) && query.length >= 2 && (
+      {showSearchResults && (
         <Card className="border-border/50 bg-card/50 divide-y divide-border/50 overflow-hidden">
           {loading ? (
             <div className="p-3 space-y-2">
@@ -109,26 +150,25 @@ export function StockSearch() {
             </div>
           ) : (
             results.map((stock) => (
-              <button
-                key={stock.code}
-                type="button"
-                onClick={() => addStock(stock)}
-                disabled={selected.some((s) => s.code === stock.code)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-foreground">
-                    {stock.code}
-                  </span>
-                  <span className="text-muted-foreground">{stock.name}</span>
-                </div>
-                {selected.some((s) => s.code === stock.code) && (
-                  <span className="text-xs text-ai-primary">Eklendi</span>
-                )}
-              </button>
+              <StockListItem key={stock.code} stock={stock} />
             ))
           )}
         </Card>
+      )}
+
+      {/* Popular stocks */}
+      {showPopular && (
+        <div>
+          <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+            <TrendingUp className="h-4 w-4" />
+            <span>Popüler Hisseler</span>
+          </div>
+          <Card className="border-border/50 bg-card/50 divide-y divide-border/50 overflow-hidden max-h-80 overflow-y-auto">
+            {POPULAR_STOCKS.map((stock) => (
+              <StockListItem key={stock.code} stock={stock} />
+            ))}
+          </Card>
+        </div>
       )}
 
       {/* Continue button */}

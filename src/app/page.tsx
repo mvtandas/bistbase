@@ -4,7 +4,6 @@ import { HeroSection } from "@/components/landing/hero-section";
 import { EmailCta } from "@/components/landing/email-cta";
 import { SampleAiCard } from "@/components/landing/sample-ai-card";
 import { SpkDisclaimer } from "@/components/shared/spk-disclaimer";
-import { Button } from "@/components/ui/button";
 
 export default function LandingPage() {
   return (
@@ -13,15 +12,18 @@ export default function LandingPage() {
       <header className="flex items-center justify-between px-6 py-4 border-b border-border/50">
         <Logo />
         <div className="flex items-center gap-3">
-          <Button variant="ghost" render={<Link href="/login" />}>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted hover:text-foreground transition-colors"
+          >
             Giriş Yap
-          </Button>
-          <Button
-            render={<Link href="/login" />}
-            className="bg-ai-primary hover:bg-ai-primary/90 text-white"
+          </Link>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center rounded-lg bg-ai-primary hover:bg-ai-primary/90 text-white px-4 py-2 text-sm font-medium transition-colors"
           >
             Kayıt Ol
-          </Button>
+          </Link>
         </div>
       </header>
 

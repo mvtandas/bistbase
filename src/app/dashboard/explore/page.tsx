@@ -7,8 +7,26 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PremiumUpsellModal } from "@/components/onboarding/premium-upsell-modal";
 import { useStockSearch } from "@/hooks/use-stock-search";
-import { Search, Plus, Check } from "lucide-react";
+import { Search, Plus, Check, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+
+const POPULAR_STOCKS = [
+  { code: "THYAO", name: "Türk Hava Yolları" },
+  { code: "SISE", name: "Şişecam" },
+  { code: "ASELS", name: "Aselsan" },
+  { code: "KCHOL", name: "Koç Holding" },
+  { code: "BIMAS", name: "BİM Mağazalar" },
+  { code: "TUPRS", name: "Tüpraş" },
+  { code: "SAHOL", name: "Sabancı Holding" },
+  { code: "EREGL", name: "Ereğli Demir Çelik" },
+  { code: "GARAN", name: "Garanti BBVA" },
+  { code: "AKBNK", name: "Akbank" },
+  { code: "YKBNK", name: "Yapı Kredi" },
+  { code: "FROTO", name: "Ford Otosan" },
+  { code: "TOASO", name: "Tofaş Oto" },
+  { code: "PGSUS", name: "Pegasus" },
+  { code: "EKGYO", name: "Emlak Konut GYO" },
+];
 
 export default function ExplorePage() {
   const [query, setQuery] = useState("");
@@ -16,6 +34,8 @@ export default function ExplorePage() {
   const [showUpsell, setShowUpsell] = useState(false);
   const { results, loading } = useStockSearch(query);
   const router = useRouter();
+
+  const showSearchResults = query.length >= 2;
 
   async function addStock(code: string) {
     try {
@@ -43,6 +63,28 @@ export default function ExplorePage() {
     }
   }
 
+  function StockItem({ code, name }: { code: string; name: string }) {
+    const isAdded = addedCodes.has(code);
+    return (
+      <button
+        type="button"
+        onClick={() => !isAdded && addStock(code)}
+        disabled={isAdded}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-accent transition-colors disabled:opacity-60"
+      >
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-foreground">{code}</span>
+          <span className="text-muted-foreground">{name}</span>
+        </div>
+        {isAdded ? (
+          <Check className="h-4 w-4 text-gain" />
+        ) : (
+          <Plus className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -63,7 +105,8 @@ export default function ExplorePage() {
         />
       </div>
 
-      {loading && (
+      {/* Search results */}
+      {showSearchResults && loading && (
         <div className="space-y-2">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
@@ -71,39 +114,33 @@ export default function ExplorePage() {
         </div>
       )}
 
-      {!loading && results.length > 0 && (
+      {showSearchResults && !loading && results.length > 0 && (
         <Card className="border-border/50 bg-card/50 divide-y divide-border/50 overflow-hidden">
-          {results.map((stock) => {
-            const isAdded = addedCodes.has(stock.code);
-            return (
-              <button
-                key={stock.code}
-                type="button"
-                onClick={() => !isAdded && addStock(stock.code)}
-                disabled={isAdded}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm hover:bg-accent transition-colors disabled:opacity-60"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-foreground">
-                    {stock.code}
-                  </span>
-                  <span className="text-muted-foreground">{stock.name}</span>
-                </div>
-                {isAdded ? (
-                  <Check className="h-4 w-4 text-gain" />
-                ) : (
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            );
-          })}
+          {results.map((stock) => (
+            <StockItem key={stock.code} code={stock.code} name={stock.name} />
+          ))}
         </Card>
       )}
 
-      {!loading && query.length >= 2 && results.length === 0 && (
+      {showSearchResults && !loading && results.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-8">
           Sonuç bulunamadı.
         </p>
+      )}
+
+      {/* Popular stocks */}
+      {!showSearchResults && (
+        <div>
+          <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+            <TrendingUp className="h-4 w-4" />
+            <span>Popüler Hisseler</span>
+          </div>
+          <Card className="border-border/50 bg-card/50 divide-y divide-border/50 overflow-hidden">
+            {POPULAR_STOCKS.map((stock) => (
+              <StockItem key={stock.code} code={stock.code} name={stock.name} />
+            ))}
+          </Card>
+        </div>
       )}
 
       <PremiumUpsellModal

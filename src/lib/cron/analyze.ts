@@ -1,19 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { getStockQuote } from "@/lib/stock/yahoo";
-import { getKapNews } from "@/lib/news/kap-rss";
+import { getStockQuote, getHistoricalBars } from "@/lib/stock/yahoo";
+import { getStockNews } from "@/lib/news/kap-rss";
 import { generateStockAnalysis } from "@/lib/ai/provider";
-
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
+import { calculateTechnicals } from "@/lib/stock/technicals";
 
 function getToday(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+}
+
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export async function runDailyAnalysis(): Promise<{
@@ -26,7 +23,7 @@ export async function runDailyAnalysis(): Promise<{
   let skipped = 0;
   let failed = 0;
 
-  // 1. Get all unique stock codes from portfolios
+  // 1. Get all unique stock codes
   const stocks = await prisma.portfolio.findMany({
     distinct: ["stockCode"],
     select: { stockCode: true },
@@ -38,12 +35,12 @@ export async function runDailyAnalysis(): Promise<{
 
   const stockCodes = stocks.map((s) => s.stockCode);
 
-  // 2. Filter out stocks that already have today's summary
+  // 2. Skip already completed
   const existing = await prisma.dailySummary.findMany({
     where: {
       date: today,
       stockCode: { in: stockCodes },
-      status: { in: ["COMPLETED", "PENDING"] },
+      status: "COMPLETED",
     },
     select: { stockCode: true },
   });
@@ -56,71 +53,71 @@ export async function runDailyAnalysis(): Promise<{
     return { processed: 0, skipped, failed: 0 };
   }
 
-  // 3. Process in chunks of 5 (rate limiting)
-  const chunks = chunkArray(toAnalyze, 5);
+  // 3. Process sequentially (Groq free tier: 30 RPM)
+  for (const stockCode of toAnalyze) {
+    try {
+      // Mark PENDING
+      await prisma.dailySummary.upsert({
+        where: { stockCode_date: { stockCode, date: today } },
+        create: { stockCode, date: today, status: "PENDING" },
+        update: { status: "PENDING" },
+      });
 
-  for (const chunk of chunks) {
-    await Promise.all(
-      chunk.map(async (stockCode) => {
-        try {
-          // Create PENDING record
-          await prisma.dailySummary.upsert({
-            where: { stockCode_date: { stockCode, date: today } },
-            create: { stockCode, date: today, status: "PENDING" },
-            update: { status: "PENDING" },
-          });
+      // Fetch data in parallel: quote + news + historical
+      const [quote, headlines, bars] = await Promise.all([
+        getStockQuote(stockCode),
+        getStockNews(stockCode),
+        getHistoricalBars(stockCode, 220), // 220 gün (MA200 için)
+      ]);
 
-          // Fetch data
-          const [quote, headlines] = await Promise.all([
-            getStockQuote(stockCode),
-            getKapNews(stockCode),
-          ]);
+      // Calculate technicals with CODE (not AI!)
+      const technicals =
+        bars.length > 0
+          ? calculateTechnicals(bars, quote?.price ?? null, quote?.volume ?? null)
+          : null;
 
-          // Generate AI summary
-          const analysis = await generateStockAnalysis({
-            stockCode,
-            price: quote?.price ?? null,
+      // Feed everything to AI for STORYTELLING only
+      const analysis = await generateStockAnalysis({
+        stockCode,
+        price: quote?.price ?? null,
+        changePercent: quote?.changePercent ?? null,
+        volume: quote?.volume ?? null,
+        newsHeadlines: headlines,
+        date: today.toISOString().split("T")[0],
+        technicals,
+      });
+
+      if (analysis) {
+        await prisma.dailySummary.update({
+          where: { stockCode_date: { stockCode, date: today } },
+          data: {
+            closePrice: quote?.price ?? null,
             changePercent: quote?.changePercent ?? null,
-            volume: quote?.volume ?? null,
+            volume: quote?.volume ? BigInt(quote.volume) : null,
             newsHeadlines: headlines,
-            date: today.toISOString().split("T")[0],
-          });
+            aiSummaryText: analysis.summaryText,
+            sentimentScore: analysis.sentimentScore,
+            status: "COMPLETED",
+          },
+        });
+        processed++;
+      } else {
+        await prisma.dailySummary.update({
+          where: { stockCode_date: { stockCode, date: today } },
+          data: {
+            closePrice: quote?.price ?? null,
+            changePercent: quote?.changePercent ?? null,
+            status: "FAILED",
+          },
+        });
+        failed++;
+      }
 
-          if (analysis) {
-            await prisma.dailySummary.update({
-              where: { stockCode_date: { stockCode, date: today } },
-              data: {
-                closePrice: quote?.price ?? null,
-                changePercent: quote?.changePercent ?? null,
-                volume: quote?.volume ? BigInt(quote.volume) : null,
-                newsHeadlines: headlines,
-                aiSummaryText: analysis.summaryText,
-                sentimentScore: analysis.sentimentScore,
-                status: "COMPLETED",
-              },
-            });
-            processed++;
-          } else {
-            await prisma.dailySummary.update({
-              where: { stockCode_date: { stockCode, date: today } },
-              data: {
-                closePrice: quote?.price ?? null,
-                changePercent: quote?.changePercent ?? null,
-                status: "FAILED",
-              },
-            });
-            failed++;
-          }
-        } catch (error) {
-          console.error(`Analysis failed for ${stockCode}:`, error);
-          failed++;
-        }
-      })
-    );
-
-    // Pause between chunks to respect rate limits
-    if (chunks.indexOf(chunk) < chunks.length - 1) {
-      await new Promise((r) => setTimeout(r, 2000));
+      // Rate limit pause
+      await sleep(3000);
+    } catch (error) {
+      console.error(`Analysis failed for ${stockCode}:`, error);
+      failed++;
     }
   }
 

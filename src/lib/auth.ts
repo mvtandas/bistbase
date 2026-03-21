@@ -1,21 +1,43 @@
 import NextAuth from "next-auth";
 import Email from "next-auth/providers/email";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+
+const resend = new Resend(process.env.EMAIL_SERVER_PASSWORD);
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
     Email({
       server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT),
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
-        },
+        host: "smtp.resend.com",
+        port: 465,
+        auth: { user: "resend", pass: process.env.EMAIL_SERVER_PASSWORD ?? "" },
       },
       from: process.env.EMAIL_FROM,
+      sendVerificationRequest: async ({ identifier: email, url }) => {
+        try {
+          await resend.emails.send({
+            from: process.env.EMAIL_FROM ?? "onboarding@resend.dev",
+            to: email,
+            subject: "Bistbase - Giriş Bağlantınız",
+            html: `
+              <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #f8fafc;">Bistbase'e Hoş Geldiniz</h2>
+                <p style="color: #94a3b8;">Giriş yapmak için aşağıdaki butona tıklayın:</p>
+                <a href="${url}" style="display: inline-block; background: #818cf8; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; margin: 16px 0;">
+                  Giriş Yap
+                </a>
+                <p style="color: #64748b; font-size: 12px;">Bu bağlantı 24 saat geçerlidir. Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
+              </div>
+            `,
+          });
+        } catch (error) {
+          console.error("Email send error:", error);
+          throw new Error("E-posta gönderilemedi");
+        }
+      },
     }),
   ],
   session: {

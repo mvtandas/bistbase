@@ -1,3 +1,5 @@
+import type { TechnicalSignals } from "@/lib/stock/technicals";
+
 export interface StockAnalysisInput {
   stockCode: string;
   price: number | null;
@@ -5,6 +7,7 @@ export interface StockAnalysisInput {
   volume: number | null;
   newsHeadlines: string[];
   date: string;
+  technicals: TechnicalSignals | null;
 }
 
 export interface StockAnalysisOutput {

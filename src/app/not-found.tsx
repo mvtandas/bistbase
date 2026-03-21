@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/shared/logo";
 
 export default function NotFound() {
@@ -12,9 +11,12 @@ export default function NotFound() {
       <p className="text-sm text-muted-foreground mb-6">
         Aradığınız sayfa mevcut değil veya taşınmış olabilir.
       </p>
-      <Button variant="outline" render={<Link href="/" />}>
+      <Link
+        href="/"
+        className="inline-flex items-center justify-center rounded-lg border border-border bg-background hover:bg-muted px-4 py-2 text-sm font-medium transition-colors"
+      >
         Ana Sayfaya Dön
-      </Button>
+      </Link>
     </div>
   );
 }

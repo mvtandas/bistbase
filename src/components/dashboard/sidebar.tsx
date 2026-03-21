@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { Logo } from "@/components/shared/logo";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
@@ -105,13 +105,15 @@ export function Sidebar({ userEmail, userPlan, portfolioStocks }: SidebarProps) 
           <p className="text-xs text-muted-foreground mb-3">
             Sınırsız hisse takibi ve detaylı analiz.
           </p>
-          <Button
-            render={<Link href="/dashboard/upgrade" />}
-            size="sm"
-            className="w-full bg-ai-premium hover:bg-ai-premium/90 text-white"
+          <Link
+            href="/dashboard/upgrade"
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "w-full bg-ai-premium hover:bg-ai-premium/90 text-white"
+            )}
           >
             Yükselt
-          </Button>
+          </Link>
         </div>
       )}
 

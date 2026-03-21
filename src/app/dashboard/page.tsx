@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DailyFeed } from "@/components/dashboard/daily-feed";
+import { PortfolioSummary } from "@/components/dashboard/portfolio-summary";
+import { MarketOverview } from "@/components/dashboard/market-overview";
 import type { DailySummaryData } from "@/types";
 
 export default async function DashboardPage() {
@@ -28,6 +30,12 @@ export default async function DashboardPage() {
   });
 
   const initialSummaries: Record<string, DailySummaryData> = {};
+  const portfolioStocks: {
+    code: string;
+    closePrice: number | null;
+    changePercent: number | null;
+  }[] = [];
+
   for (const s of summaries) {
     initialSummaries[s.stockCode] = {
       id: s.id,
@@ -39,6 +47,11 @@ export default async function DashboardPage() {
       sentimentScore: s.sentimentScore,
       status: s.status,
     };
+    portfolioStocks.push({
+      code: s.stockCode,
+      closePrice: s.closePrice,
+      changePercent: s.changePercent,
+    });
   }
 
   return (
@@ -49,6 +62,12 @@ export default async function DashboardPage() {
           Günlük yapay zeka destekli hisse analizleri
         </p>
       </div>
+
+      <MarketOverview />
+
+      {portfolioStocks.length > 0 && (
+        <PortfolioSummary stocks={portfolioStocks} />
+      )}
 
       <DailyFeed stockCodes={stockCodes} initialSummaries={initialSummaries} />
     </div>
