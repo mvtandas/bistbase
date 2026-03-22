@@ -10,6 +10,10 @@ interface StockCardProps {
   aiSummaryText: string | null;
   sentimentScore: string | null;
   status: string;
+  compositeScore?: number | null;
+  bullCase?: string | null;
+  bearCase?: string | null;
+  confidence?: string | null;
 }
 
 export function StockCard({
@@ -19,6 +23,10 @@ export function StockCard({
   aiSummaryText,
   sentimentScore,
   status,
+  compositeScore,
+  bullCase,
+  bearCase,
+  confidence,
 }: StockCardProps) {
   const isPositive = (changePercent ?? 0) >= 0;
   const sentimentLabel =
@@ -49,6 +57,14 @@ export function StockCard({
             <span className="text-base font-bold text-foreground group-hover/link:text-ai-primary transition-colors">
               {stockCode}
             </span>
+            {compositeScore != null && (
+              <span className={cn(
+                "ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded tabular-nums",
+                compositeScore >= 60 ? "bg-gain/10 text-gain" : compositeScore >= 40 ? "bg-amber-400/10 text-amber-400" : "bg-loss/10 text-loss"
+              )}>
+                {compositeScore}
+              </span>
+            )}
           </div>
         </Link>
 
@@ -99,12 +115,30 @@ export function StockCard({
               </p>
             ))}
 
-          {/* Sentiment Footer */}
+          {/* Bull / Bear mini */}
+          {(bullCase || bearCase) && (
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              {bullCase && (
+                <div className="rounded-lg bg-gain/5 border border-gain/10 p-2">
+                  <p className="text-[9px] font-medium text-gain uppercase mb-1">Boğa</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed ">{bullCase}</p>
+                </div>
+              )}
+              {bearCase && (
+                <div className="rounded-lg bg-loss/5 border border-loss/10 p-2">
+                  <p className="text-[9px] font-medium text-loss uppercase mb-1">Ayı</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed ">{bearCase}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer */}
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-3 w-3 text-ai-primary" />
               <span className="text-[11px] text-muted-foreground/60">
-                AI Analiz
+                AI Analiz{confidence ? ` · ${confidence}` : ""}
               </span>
             </div>
             <div className="flex items-center gap-1.5">

@@ -62,12 +62,28 @@ model User {
   portfolios    Portfolio[]
   accounts      Account[]
   sessions      Session[]
+  alertPrefs    AlertPreference?
+}
+
+model AlertPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  morningDigest     Boolean  @default(true)   // Sabah 08:30 portföy özeti
+  signalAlerts      Boolean  @default(true)   // Yeni sinyal bildirimi
+  scoreChangeAlerts Boolean  @default(true)   // Skor ±15 puan değişim
+  macroAlerts       Boolean  @default(true)   // USD/TRY %2+, VIX 25+
+  weeklyReport      Boolean  @default(true)   // Cuma haftalık rapor
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Portfolio {
   id        String   @id @default(cuid())
   userId    String
   stockCode String   // e.g. THYAO
+  quantity  Float?   // lot sayısı (opsiyonel)
+  avgCost   Float?   // ortalama maliyet TL (opsiyonel)
   addedAt   DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -76,20 +92,174 @@ model Portfolio {
 }
 
 model DailySummary {
-  id             String   @id @default(cuid())
-  stockCode      String   // e.g. THYAO
-  date           DateTime @db.Date
-  closePrice     Float?
-  changePercent  Float?
-  volume         BigInt?
-  newsHeadlines  Json?    // string[]
-  aiSummaryText  String?  @db.Text
-  sentimentScore String?  // POSITIVE, NEGATIVE, NEUTRAL
-  status         String   @default("PENDING") // PENDING, COMPLETED, FAILED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  stockCode       String
+  date            DateTime @db.Date
+  closePrice      Float?
+  changePercent   Float?
+  volume          BigInt?
+  newsHeadlines   Json?
+  aiSummaryText   String?  @db.Text
+  sentimentScore  String?  // legacy: POSITIVE, NEGATIVE, NEUTRAL
+  status          String   @default("PENDING")
+  timeframe       String   @default("daily") // daily, weekly, monthly
+  // v2 fields
+  compositeScore  Float?   // 0-100
+  sentimentValue  Float?   // -100 to +100
+  bullCase        String?  @db.Text
+  bearCase        String?  @db.Text
+  confidence      String?  // HIGH, MEDIUM, LOW
+  sectorCode      String?
+  sectorChange    Float?
+  relativeStrength Float?  // stock change - sector change
+  bist100Change   Float?
+  verdictReason   String?  @db.Text
+  analyzedAt      DateTime?  // Analiz yapılma saati (cron zamanı)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([stockCode, date, timeframe])
+  @@index([stockCode, date])
+  @@index([status])
+}
+
+// ---- v2: Technical Indicators (persisted, not ephemeral) ----
+
+model TechnicalSnapshot {
+  id            String   @id @default(cuid())
+  stockCode     String
+  date          DateTime @db.Date
+  closePrice    Float?
+  // RSI
+  rsi14         Float?
+  // Moving Averages
+  ma20          Float?
+  ma50          Float?
+  ma200         Float?
+  ema12         Float?
+  ema26         Float?
+  // MACD
+  macdLine      Float?
+  macdSignal    Float?
+  macdHistogram Float?
+  // Bollinger Bands
+  bbUpper       Float?
+  bbMiddle      Float?
+  bbLower       Float?
+  bbWidth       Float?
+  bbPercentB    Float?
+  // ATR
+  atr14         Float?
+  // Stochastic
+  stochK        Float?
+  stochD        Float?
+  // OBV
+  obv           Float?
+  obvMa20       Float?
+  // ADX
+  adx14         Float?
+  plusDI         Float?
+  minusDI       Float?
+  // Volume
+  volume        BigInt?
+  volumeAvg20   Float?
+  volumeRatio   Float?
+  // Support / Resistance
+  supportLevel  Float?
+  resistLevel   Float?
+  // Composite Scores
+  technicalScore  Float?
+  momentumScore   Float?
+  volumeScore     Float?
+  volatilityScore Float?
+  compositeScore  Float?
+  createdAt     DateTime @default(now())
 
   @@unique([stockCode, date])
   @@index([stockCode])
+  @@index([date])
+}
+
+model Signal {
+  id              String   @id @default(cuid())
+  stockCode       String
+  date            DateTime @db.Date
+  signalType      String   // GOLDEN_CROSS, RSI_OVERSOLD, MACD_BULLISH_CROSS, etc.
+  signalDirection String   // BULLISH, BEARISH, NEUTRAL
+  strength        Float    // 0-100
+  description     String   @db.Text
+  // Outcome tracking
+  priceAtSignal     Float?
+  priceAfter1Day    Float?
+  priceAfter5Days   Float?
+  priceAfter10Days  Float?
+  outcomePercent1D  Float?
+  outcomePercent5D  Float?
+  outcomePercent10D Float?
+  wasAccurate       Boolean?
+  confirmed         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  @@unique([stockCode, date, signalType, signalDirection])
+  @@index([stockCode])
+  @@index([date])
+  @@index([signalType])
+  @@index([stockCode, date])
+  @@index([strength])
+  @@index([wasAccurate, date])
+}
+
+model SectorSnapshot {
+  id            String   @id @default(cuid())
+  sectorCode    String
+  sectorName    String
+  date          DateTime @db.Date
+  price         Float?
+  changePercent Float?
+  createdAt     DateTime @default(now())
+
+  @@unique([sectorCode, date])
+  @@index([date])
+}
+
+model PortfolioSnapshot {
+  id                    String   @id @default(cuid())
+  userId                String
+  date                  DateTime @db.Date
+  timeframe             String   @default("daily")
+
+  // Verdict
+  verdictAction         String?
+  verdictScore          Float?
+  verdictConfidence     Float?
+  compositeScore        Float?
+
+  // Metrics
+  totalValue            Float?
+  totalPnL              Float?
+  totalPnLPercent       Float?
+  dailyChange           Float?
+  portfolioBeta         Float?
+
+  // Risk
+  portfolioVaR95        Float?
+  diversificationScore  Float?
+  avgVolatility         Float?
+
+  // Benchmark
+  bist100Return         Float?
+  alpha                 Float?
+  trackingError         Float?
+
+  // JSON
+  allocation            Json?
+  sectorAllocation      Json?
+  holdingVerdicts       Json?
+  riskContributions     Json?
+
+  createdAt             DateTime @default(now())
+
+  @@unique([userId, date, timeframe])
+  @@index([userId, timeframe])
   @@index([date])
 }

@@ -8,6 +8,7 @@ const envSchema = z.object({
   EMAIL_SERVER_PASSWORD: z.string().optional(),
   EMAIL_FROM: z.string().default("onboarding@resend.dev"),
   AI_MODEL: z.string().default("llama-3.3-70b-versatile"),
+  RISK_FREE_RATE: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().default("http://localhost:3000"),
 });
 

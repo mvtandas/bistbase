@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { stockCode } = await request.json();
+  const { stockCode, quantity, avgCost } = await request.json();
   if (!stockCode || typeof stockCode !== "string") {
     return NextResponse.json(
       { error: "stockCode gerekli" },
@@ -63,8 +63,13 @@ export async function POST(request: NextRequest) {
     create: {
       userId: session.user.id,
       stockCode: code,
+      quantity: typeof quantity === "number" && quantity > 0 ? quantity : null,
+      avgCost: typeof avgCost === "number" && avgCost > 0 ? avgCost : null,
     },
-    update: {},
+    update: {
+      ...(typeof quantity === "number" && quantity > 0 ? { quantity } : {}),
+      ...(typeof avgCost === "number" && avgCost > 0 ? { avgCost } : {}),
+    },
   });
 
   return NextResponse.json(portfolio, { status: 201 });
@@ -95,4 +100,34 @@ export async function DELETE(request: NextRequest) {
   });
 
   return NextResponse.json({ success: true });
+}
+
+// PATCH: Update quantity/cost for a stock
+export async function PATCH(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { stockCode, quantity, avgCost } = await request.json();
+  if (!stockCode || typeof stockCode !== "string") {
+    return NextResponse.json({ error: "stockCode gerekli" }, { status: 400 });
+  }
+
+  const code = stockCode.replace(".IS", "").toUpperCase();
+
+  const updated = await prisma.portfolio.update({
+    where: {
+      userId_stockCode: {
+        userId: session.user.id,
+        stockCode: code,
+      },
+    },
+    data: {
+      quantity: typeof quantity === "number" && quantity >= 0 ? (quantity === 0 ? null : quantity) : undefined,
+      avgCost: typeof avgCost === "number" && avgCost >= 0 ? (avgCost === 0 ? null : avgCost) : undefined,
+    },
+  });
+
+  return NextResponse.json(updated);
 }

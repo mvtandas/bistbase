@@ -22,6 +22,11 @@ export interface DailySummaryData {
   aiSummaryText: string | null;
   sentimentScore: string | null;
   status: string;
+  // v2
+  compositeScore: number | null;
+  bullCase: string | null;
+  bearCase: string | null;
+  confidence: string | null;
 }
 
 declare module "next-auth" {

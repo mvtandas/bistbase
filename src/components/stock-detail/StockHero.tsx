@@ -1,0 +1,106 @@
+"use client";
+
+import { cn } from "@/lib/utils";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import type { StockDetail, Period } from "./types";
+import { PERIOD_LABELS } from "./types";
+
+interface StockHeroProps {
+  data: StockDetail;
+  activeData: StockDetail | undefined;
+  period: Period;
+  setPeriod: (p: Period) => void;
+  pdLoading: boolean;
+  stockCode: string;
+}
+
+export function StockHero({ data, activeData, period, setPeriod, pdLoading, stockCode }: StockHeroProps) {
+  const d = activeData;
+  const isPositive = (data.changePercent ?? 0) >= 0;
+  const activeScore = period === "today" ? data.score : d?.score;
+  const absoluteChange = data.price != null && data.changePercent != null
+    ? (data.price * data.changePercent / (100 + data.changePercent))
+    : null;
+
+  return (
+    <div className="sticky top-0 z-20 bg-background -mx-4 md:-mx-6 px-4 md:px-6 -mt-6 md:-mt-8 pt-4 pb-3 mb-4 border-b border-border/30">
+      {/* Row 1: Code + Price + Score */}
+      <div className="flex items-center justify-between gap-3">
+        {/* Left: Code + Price */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ai-primary/10 text-ai-primary text-xs font-bold shrink-0">
+            {stockCode.slice(0, 3)}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-base font-bold text-foreground leading-none">{stockCode}</h1>
+              <span className="text-xs text-muted-foreground/60 truncate hidden sm:inline">{data.name}</span>
+            </div>
+            {data.price != null && (
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl font-extrabold text-foreground tabular-nums">₺{data.price.toFixed(2)}</span>
+                {data.changePercent != null && (
+                  <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold", isPositive ? "text-gain" : "text-loss")}>
+                    {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                    {absoluteChange != null && <span>{isPositive ? "+" : ""}₺{Math.abs(absoluteChange).toFixed(2)}</span>}
+                    <span>({isPositive ? "+" : ""}{data.changePercent.toFixed(2)}%)</span>
+                  </span>
+                )}
+                {period !== "today" && d?.changePercent != null && (
+                  <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", d.changePercent >= 0 ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss")}>
+                    {period === "week" ? "H" : "A"}: {d.changePercent >= 0 ? "+" : ""}{d.changePercent.toFixed(2)}%
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Score */}
+        {activeScore && (
+          <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shrink-0",
+            activeScore.composite >= 70 ? "bg-gain/5 border-gain/15" :
+            activeScore.composite >= 45 ? "bg-amber-400/5 border-amber-400/15" :
+            "bg-loss/5 border-loss/15"
+          )}>
+            <span className={cn(
+              "text-lg font-extrabold tabular-nums leading-none",
+              activeScore.composite >= 70 ? "text-gain" :
+              activeScore.composite >= 45 ? "text-amber-400" : "text-loss"
+            )}>
+              {activeScore.composite}
+            </span>
+            <span className="text-[9px] font-medium text-muted-foreground/60 leading-tight">{activeScore.labelTr}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Row 2: Period tabs */}
+      <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-card/40 border border-border/20">
+          {(["today", "week", "month"] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={cn(
+                "px-3 py-1 text-[11px] font-medium rounded-md transition-all",
+                period === p
+                  ? "bg-ai-primary text-white shadow-sm"
+                  : "text-muted-foreground/70 hover:text-foreground hover:bg-card/60"
+              )}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        {period !== "today" && pdLoading && (
+          <div className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-ai-primary animate-pulse" />
+            <span className="text-[10px] text-muted-foreground/60">Yükleniyor</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

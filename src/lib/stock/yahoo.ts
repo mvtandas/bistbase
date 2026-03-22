@@ -75,7 +75,7 @@ export async function getStockQuote(code: string): Promise<StockQuote | null> {
 export async function getHistoricalBars(
   code: string,
   days = 220
-): Promise<{ date: string; close: number; high: number; low: number; volume: number }[]> {
+): Promise<{ date: string; open: number; close: number; high: number; low: number; volume: number }[]> {
   const symbol = toISSymbol(code);
   try {
     const start = new Date();
@@ -87,6 +87,7 @@ export async function getHistoricalBars(
     if (!history || !Array.isArray(history)) return [];
     return history.map((bar: Record<string, unknown>) => ({
       date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
+      open: (bar.open as number) ?? 0,
       close: (bar.close as number) ?? 0,
       high: (bar.high as number) ?? 0,
       low: (bar.low as number) ?? 0,
@@ -94,6 +95,35 @@ export async function getHistoricalBars(
     }));
   } catch (error) {
     console.error(`Historical data error for ${symbol}:`, error);
+    return [];
+  }
+}
+
+export async function getHistoricalBarsInterval(
+  code: string,
+  interval: "1wk" | "1mo",
+  days = 730
+): Promise<{ date: string; open: number; close: number; high: number; low: number; volume: number }[]> {
+  const symbol = toISSymbol(code);
+  try {
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    const history = await yf.historical(symbol, {
+      period1: start,
+      period2: new Date(),
+      interval,
+    });
+    if (!history || !Array.isArray(history)) return [];
+    return history.map((bar: Record<string, unknown>) => ({
+      date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
+      open: (bar.open as number) ?? 0,
+      close: (bar.close as number) ?? 0,
+      high: (bar.high as number) ?? 0,
+      low: (bar.low as number) ?? 0,
+      volume: (bar.volume as number) ?? 0,
+    }));
+  } catch (error) {
+    console.error(`Historical interval data error for ${symbol}:`, error);
     return [];
   }
 }
