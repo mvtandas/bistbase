@@ -29,14 +29,17 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
     setLoading(true);
     setError("");
     try {
-      const result = await signIn("email", {
-        email,
-        redirect: false,
-        callbackUrl: "/onboarding",
+      const normalizedEmail = email.toLowerCase().trim();
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail }),
       });
-      if (result?.error) {
-        setError("E-posta gönderilemedi. Tekrar deneyin.");
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "E-posta gönderilemedi. Tekrar deneyin.");
       } else {
+        setEmail(normalizedEmail);
         setStep("otp");
       }
     } catch {
@@ -80,7 +83,7 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
 
     try {
       const result = await signIn("otp", {
-        email,
+        email: email.toLowerCase().trim(),
         code,
         redirect: false,
         callbackUrl: "/onboarding",
