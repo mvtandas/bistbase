@@ -3,8 +3,13 @@ import Email from "next-auth/providers/email";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 const resend = new Resend(process.env.EMAIL_SERVER_PASSWORD);
+
+function generateOTP() {
+  return crypto.randomInt(100000, 999999).toString();
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
@@ -17,20 +22,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         auth: { user: "resend", pass: process.env.EMAIL_SERVER_PASSWORD ?? "" },
       },
       from: process.env.EMAIL_FROM,
-      sendVerificationRequest: async ({ identifier: email, url }) => {
+      maxAge: 10 * 60, // 10 dakika geçerli
+      generateVerificationToken: () => generateOTP(),
+      sendVerificationRequest: async ({ identifier: email, token }) => {
         try {
           await resend.emails.send({
-            from: process.env.EMAIL_FROM ?? "onboarding@resend.dev",
+            from: process.env.EMAIL_FROM ?? "noreply@bistbase.com",
             to: email,
-            subject: "Bistbase - Giriş Bağlantınız",
+            subject: `Bistbase - Doğrulama Kodunuz: ${token}`,
             html: `
-              <div style="font-family: sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #f8fafc;">Bistbase'e Hoş Geldiniz</h2>
-                <p style="color: #94a3b8;">Giriş yapmak için aşağıdaki butona tıklayın:</p>
-                <a href="${url}" style="display: inline-block; background: #818cf8; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; margin: 16px 0;">
-                  Giriş Yap
-                </a>
-                <p style="color: #64748b; font-size: 12px;">Bu bağlantı 24 saat geçerlidir. Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 400px; margin: 0 auto; padding: 32px 20px; background: #0f172a; border-radius: 12px;">
+                <h2 style="color: #f1f5f9; margin: 0 0 8px 0; font-size: 20px;">Bistbase</h2>
+                <p style="color: #94a3b8; margin: 0 0 24px 0; font-size: 14px;">Giriş yapmak için aşağıdaki kodu kullanın:</p>
+                <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
+                  <span style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #818cf8; font-family: monospace;">${token}</span>
+                </div>
+                <p style="color: #64748b; font-size: 12px; margin: 0;">Bu kod 10 dakika geçerlidir. Eğer bu isteği siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
               </div>
             `,
           });
