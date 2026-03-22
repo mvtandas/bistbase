@@ -61,9 +61,9 @@ export function detectVolatilityRegime(macroData?: MacroData | null): Volatility
 
   // VIX bazlı global rejim
   if (vix != null) {
-    if (vix > 35) regime = "CRISIS";
-    else if (vix > 25) regime = "HIGH";
-    else if (vix < 15) regime = "LOW";
+    if (vix > 30) regime = "CRISIS";
+    else if (vix > 20) regime = "HIGH";
+    else if (vix < 12) regime = "LOW";
   }
 
   // Yerel piyasa koşulları — VIX düşükken bile Türk piyasası kriz yaşayabilir
@@ -122,7 +122,7 @@ function scoreTechnical(t: FullTechnicalData, price: number): number {
   let score = 50;
 
   if (t.rsi14 != null) {
-    if (t.rsi14 >= 70) score += t.rsiBearishDivergence ? -15 : -5;
+    if (t.rsi14 >= 70) score += t.rsiBearishDivergence ? -25 : -5;
     else if (t.rsi14 <= 30) score += t.rsiBullishDivergence ? 25 : 5;
     else if (t.rsi14 >= 40 && t.rsi14 <= 60) score += 10;
   }
@@ -227,7 +227,10 @@ function scoreVolatility(t: FullTechnicalData): number {
 
   if (t.bbPercentB != null) {
     if (t.bbPercentB < 0) score -= 10;
-    else if (t.bbPercentB > 1) score -= 5;
+    else if (t.bbPercentB > 1) {
+      // Üst band kırılımı: trend yönüne bağlı (güçlü trend = breakout, zayıf = aşırı uzanma)
+      score += (t.maAlignment === "STRONG_BULLISH" || t.maAlignment === "BULLISH") ? 5 : -5;
+    }
     else if (t.bbPercentB > 0.3 && t.bbPercentB < 0.7) score += 5;
   }
 

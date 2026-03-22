@@ -84,8 +84,8 @@ export function detectCandlestickPatterns(rawBars: HistoricalBar[]): Candlestick
 
   // ── TEK MUM ──
 
-  // Doji
-  if (bod <= range * 0.1) {
+  // Doji (endüstri standardı: gövde ≤ %5 range)
+  if (bod <= range * 0.05) {
     if (b.close <= b.low + range * 0.15 && upperShadow(b) > range * 0.6) {
       patterns.push({ name: "GRAVESTONE_DOJI", nameTr: "Mezar Taşı Doji", type: "REVERSAL", direction: "BEARISH", strength: 50, barIndex: i, description: "Mezar taşı doji: Üst gölge çok uzun, gövde dipte. Yükseliş trendinde tepe sinyali." });
     } else if (b.close >= b.high - range * 0.15 && lowerShadow(b) > range * 0.6) {

@@ -17,7 +17,7 @@ export default async function DashboardLayout({
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { email: true, plan: true },
+    select: { email: true, plan: true, role: true },
   });
 
   const portfolios = await prisma.portfolio.findMany({
@@ -42,12 +42,13 @@ export default async function DashboardLayout({
         <Sidebar
           userEmail={user?.email ?? ""}
           userPlan={user?.plan ?? "FREE"}
+          userRole={user?.role ?? "USER"}
           portfolioStocks={portfolioStocks}
         />
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-8">
+        <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 md:py-8">
           {children}
         </div>
       </main>

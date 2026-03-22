@@ -7,12 +7,24 @@ const yf = new (YahooFinance as any)({
 });
 
 const INDICES = [
+  // Ana endeksler
   { symbol: "XU100.IS", name: "BİST 100" },
   { symbol: "XU030.IS", name: "BİST 30" },
+  { symbol: "XU050.IS", name: "BİST 50" },
+  // Sektör endeksleri
   { symbol: "XBANK.IS", name: "Bankacılık" },
   { symbol: "XHOLD.IS", name: "Holding" },
   { symbol: "XUSIN.IS", name: "Sınai" },
   { symbol: "XELKT.IS", name: "Elektrik" },
+  { symbol: "XULAS.IS", name: "Ulaştırma" },
+  { symbol: "XGIDA.IS", name: "Gıda" },
+  { symbol: "XILTM.IS", name: "İletişim" },
+  { symbol: "XMANA.IS", name: "Metal & Madencilik" },
+  { symbol: "XTRZM.IS", name: "Turizm" },
+  // Global referanslar
+  { symbol: "USDTRY=X", name: "USD/TRY" },
+  { symbol: "EURTRY=X", name: "EUR/TRY" },
+  { symbol: "GC=F", name: "Altın (USD)" },
 ];
 
 // En çok işlem gören BİST hisseleri (top movers'ı buradan çekeceğiz)
@@ -71,10 +83,30 @@ export async function GET() {
     const gainers = sorted.slice(0, 5);
     const losers = sorted.slice(-5).reverse();
 
+    // Breadth data
+    const advancing = validStocks.filter((s) => (s.changePercent ?? 0) > 0).length;
+    const declining = validStocks.filter((s) => (s.changePercent ?? 0) < 0).length;
+    const unchanged = validStocks.length - advancing - declining;
+
+    const advancingVolume = validStocks
+      .filter((s) => (s.changePercent ?? 0) > 0)
+      .reduce((sum, s) => sum + (s.volume ?? 0), 0);
+    const decliningVolume = validStocks
+      .filter((s) => (s.changePercent ?? 0) < 0)
+      .reduce((sum, s) => sum + (s.volume ?? 0), 0);
+
     return NextResponse.json({
       indices,
       gainers,
       losers,
+      breadth: {
+        advancing,
+        declining,
+        unchanged,
+        total: validStocks.length,
+        advancingVolume,
+        decliningVolume,
+      },
     });
   } catch {
     return NextResponse.json({ indices: [], gainers: [], losers: [] });

@@ -101,12 +101,14 @@ export async function getMacroData(): Promise<MacroData> {
     // -0.3 ile +0.5 arası = normal gürültü, skor değişmez
   }
 
-  // ── DXY — Dolar Endeksi (EM'ler için ters ilişki) ──
+  // ── DXY — Dolar Endeksi (EM'ler için ters ilişki — ağırlık artırıldı) ──
   if (dxy.changePercent != null) {
-    if (dxy.changePercent < -0.5) score += 8;   // Dolar zayıflıyor = EM'lere iyi
+    if (dxy.changePercent < -0.8) score += 12;  // Dolar sert zayıflıyor = EM'lere çok iyi
+    else if (dxy.changePercent < -0.5) score += 8;
     else if (dxy.changePercent < -0.2) score += 4;
-    else if (dxy.changePercent > 0.8) score -= 10;
-    else if (dxy.changePercent > 0.3) score -= 5;
+    else if (dxy.changePercent > 1.5) score -= 25; // Dolar sert güçleniyor = EM çıkışları
+    else if (dxy.changePercent > 0.8) score -= 15;
+    else if (dxy.changePercent > 0.3) score -= 7;
   }
 
   // ── BİST 100 — Piyasa Momentum ──
@@ -119,33 +121,44 @@ export async function getMacroData(): Promise<MacroData> {
     else if (bist100.changePercent < 0) score -= 3;
   }
 
-  // ── VIX — Korku Endeksi (mutlak seviye daha önemli, değişim ikincil) ──
+  // ── VIX — Korku Endeksi (seviye + yön birlikte) ──
   if (vix.price != null) {
-    // Seviye bazlı (asıl sinyal)
-    if (vix.price < 13) score += 10;       // Çok sakin
-    else if (vix.price < 18) score += 5;   // Normal-sakin
-    else if (vix.price > 35) score -= 15;  // Panik
-    else if (vix.price > 28) score -= 10;  // Kriz eşiği
-    else if (vix.price > 22) score -= 3;   // Tedirginlik
+    const vixFalling = vix.changePercent != null && vix.changePercent < -3;
+    const vixRising = vix.changePercent != null && vix.changePercent > 5;
 
-    // Yön bazlı (değişim sert mi?)
+    // Seviye bazlı (asıl sinyal) — yön ile modifiye edilir
+    if (vix.price < 13) score += 10;
+    else if (vix.price < 18) score += 5;
+    else if (vix.price > 35) {
+      // VIX 35+ ama düşüyorsa → panik azalıyor, cezayı hafiflet
+      score -= vixFalling ? 8 : 15;
+    }
+    else if (vix.price > 28) {
+      score -= vixFalling ? 5 : 10;
+    }
+    else if (vix.price > 22) {
+      score -= vixFalling ? 0 : 3;
+    }
+
+    // Yön bazlı (ani değişim sinyali)
     if (vix.changePercent != null) {
-      if (vix.changePercent > 15) score -= 5;    // VIX spike = ani korku
-      else if (vix.changePercent < -10) score += 3; // VIX düşüşü = rahatlama
+      if (vix.changePercent > 20) score -= 8;     // VIX spike = ani panik
+      else if (vixRising) score -= 3;
+      else if (vix.changePercent < -15) score += 5; // VIX çöküşü = güçlü rahatlama
+      else if (vixFalling) score += 2;
     }
   }
 
-  // ── US 10Y Tahvil (mutlak seviye + yön) ──
+  // ── US 10Y Tahvil (hafifletilmiş — Türkiye ile korelasyonu düşük) ──
+  // NOT: ^TNX ABD 10Y faizi, Türkiye faizi değil. Sadece EM genel sentiment göstergesi.
+  // Ağırlık azaltıldı, asıl etki DXY ve USD/TRY'de.
   if (turkey10Y.price != null) {
-    // Seviye: Yüksek faiz = EM'lerden çıkış
-    if (turkey10Y.price > 5) score -= 5;
-    else if (turkey10Y.price < 3.5) score += 5;
+    if (turkey10Y.price > 5) score -= 3;       // was -5
+    else if (turkey10Y.price < 3.5) score += 3; // was +5
 
-    // Yön
     if (turkey10Y.changePercent != null) {
-      if (turkey10Y.changePercent > 3) score -= 8;
-      else if (turkey10Y.changePercent > 1.5) score -= 3;
-      else if (turkey10Y.changePercent < -3) score += 5;
+      if (turkey10Y.changePercent > 3) score -= 4; // was -8
+      else if (turkey10Y.changePercent < -3) score += 3; // was +5
     }
   }
 

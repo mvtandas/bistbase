@@ -47,14 +47,8 @@ export default async function ProfilePage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Plan</span>
-              <Badge
-                className={
-                  user?.plan === "PREMIUM"
-                    ? "bg-ai-premium/10 text-ai-premium border-ai-premium/20"
-                    : "bg-secondary text-muted-foreground"
-                }
-              >
-                {user?.plan === "PREMIUM" ? "Premium" : "Ücretsiz"}
+              <Badge className="bg-ai-primary/10 text-ai-primary border-ai-primary/20">
+                Beta
               </Badge>
             </div>
             <div className="flex items-center justify-between">

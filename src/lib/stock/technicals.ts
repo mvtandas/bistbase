@@ -420,7 +420,7 @@ function calculateClusterSR(bars: HistoricalBar[], atr: number | null): {
   support: number | null; resistance: number | null;
 } {
   if (bars.length < 10) return { support: null, resistance: null };
-  const last30 = bars.slice(-30);
+  const last30 = bars.slice(-60);
   const tolerance = atr != null ? atr * 0.5 : (last30[0].close * 0.02);
 
   // Collect all swing lows and highs

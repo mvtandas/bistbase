@@ -131,8 +131,7 @@ export function PriceChart({ bars, overlays, period }: PriceChartProps) {
         scaleMargins: { top: 0.08, bottom: 0.22 },
       },
       handleScroll: { vertTouchDrag: false },
-      attributionLogo: false,
-    });
+    } as Parameters<typeof createChart>[1]);
 
     chartRef.current = chart;
 

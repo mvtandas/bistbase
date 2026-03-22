@@ -50,6 +50,11 @@ enum Plan {
   PREMIUM
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
   id            String      @id @default(cuid())
   name          String?
@@ -57,12 +62,14 @@ model User {
   emailVerified DateTime?
   image         String?
   plan          Plan        @default(FREE)
+  role          Role        @default(USER)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   portfolios    Portfolio[]
   accounts      Account[]
   sessions      Session[]
   alertPrefs    AlertPreference?
+  aiDisclaimerAccepted Boolean @default(false)
 }
 
 model AlertPreference {
@@ -115,12 +122,27 @@ model DailySummary {
   bist100Change   Float?
   verdictReason   String?  @db.Text
   analyzedAt      DateTime?  // Analiz yapılma saati (cron zamanı)
+  // v3: Verdict tracking
+  verdictAction     String?   // GUCLU_AL, AL, TUT, SAT, GUCLU_SAT
+  verdictScore      Float?    // -1.0 to +1.0
+  verdictConfidence Float?    // 5-95
+  // v3: Outcome tracking
+  priceAfter1D      Float?
+  priceAfter5D      Float?
+  priceAfter10D     Float?
+  priceAfter20D     Float?
+  outcomePercent1D  Float?
+  outcomePercent5D  Float?
+  outcomePercent10D Float?
+  outcomePercent20D Float?
+  verdictAccurate   Boolean?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@unique([stockCode, date, timeframe])
   @@index([stockCode, date])
   @@index([status])
+  @@index([verdictAction])
 }
 
 // ---- v2: Technical Indicators (persisted, not ephemeral) ----
@@ -222,6 +244,22 @@ model SectorSnapshot {
   @@index([date])
 }
 
+// ---- v3: Specialized AI Insights (cached per feature per day) ----
+
+model AiInsight {
+  id          String   @id @default(cuid())
+  stockCode   String
+  date        DateTime @db.Date
+  insightType String   // "akilli-ozet", "giris-cikis", "teknik-yorum", "sinyal-cozum", "risk-senaryo", "sektor-analiz", "islem-kurulumu"
+  timeframe   String   @default("daily")
+  resultJson  Json
+  status      String   @default("COMPLETED")
+  createdAt   DateTime @default(now())
+
+  @@unique([stockCode, date, insightType, timeframe])
+  @@index([stockCode, insightType])
+}
+
 model PortfolioSnapshot {
   id                    String   @id @default(cuid())
   userId                String
@@ -262,4 +300,104 @@ model PortfolioSnapshot {
   @@unique([userId, date, timeframe])
   @@index([userId, timeframe])
   @@index([date])
+}
+
+// ---- v4: Screener Snapshots (cron-generated, per stock per day) ----
+
+model ScreenerSnapshot {
+  id            String   @id @default(cuid())
+  stockCode     String
+  date          DateTime @db.Date
+  name          String?
+
+  // Fiyat
+  price         Float?
+  changePercent Float?
+  volume        Float?
+
+  // Composite + Verdict
+  compositeScore    Float?
+  compositeJson     Json?
+  verdictAction     String?
+  verdictScore      Float?
+  verdictConfidence Int?
+  verdictJson       Json?
+
+  // Teknik özet
+  rsi14           Float?
+  macdHistogram   Float?
+  maAlignment     String?
+  adx14           Float?
+
+  // Temel özet
+  fundamentalScore  Float?
+  fundamentalJson   Json?
+  peRatio           Float?
+  pbRatio           Float?
+  dividendYield     Float?
+  fiftyTwoWeekHigh  Float?
+  fiftyTwoWeekLow   Float?
+  fromFiftyTwoHigh  Float?
+
+  // Risk
+  riskLevel       String?
+  sharpeRatio     Float?
+  maxDrawdown     Float?
+  riskJson        Json?
+
+  // Sinyaller
+  signalsJson           Json?
+  signalCombinationJson Json?
+  bullishSignalCount    Int    @default(0)
+  bearishSignalCount    Int    @default(0)
+
+  // Multi-timeframe
+  mtfAlignment    String?
+  mtfJson         Json?
+
+  // Sektör
+  sectorCode      String?
+  sectorName      String?
+
+  // Endeks üyelikleri
+  inBist30        Boolean @default(false)
+  inBist50        Boolean @default(false)
+  inBist100       Boolean @default(false)
+  inXtm25         Boolean @default(false)
+  inXkury         Boolean @default(false)
+  inXusrd         Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+
+  @@unique([stockCode, date])
+  @@index([date])
+  @@index([compositeScore])
+  @@index([verdictAction])
+  @@index([inBist30, date])
+  @@index([inBist50, date])
+  @@index([inBist100, date])
+  @@index([inXtm25, date])
+  @@index([inXkury, date])
+  @@index([inXusrd, date])
+}
+
+// ---- v5: Admin Models ----
+
+model CronLog {
+  id        String    @id @default(cuid())
+  cronName  String
+  status    String    // RUNNING, SUCCESS, FAILED
+  duration  Int?      // milliseconds
+  result    Json?
+  error     String?   @db.Text
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([cronName, startedAt])
+}
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

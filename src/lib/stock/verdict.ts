@@ -159,15 +159,15 @@ function castMAVotes(t: Record<string, unknown>, extra: VerdictInput["extraIndic
   // 7: KAMA
   vote(extra?.priceVsKama != null ? extra.priceVsKama === "ABOVE" : null);
 
-  // 8: Ichimoku Cloud
+  // 8: Ichimoku Cloud (2x ağırlık — composite indicator, 5 bileşen)
   const ichimoku = t.ichimoku as { priceVsCloud?: string; tkCross?: string } | null;
   if (ichimoku?.priceVsCloud) {
-    if (ichimoku.priceVsCloud === "ABOVE") buy++;
-    else if (ichimoku.priceVsCloud === "BELOW") sell++;
-    else neutral++; // INSIDE
-  } else { neutral++; }
+    if (ichimoku.priceVsCloud === "ABOVE") buy += 2;
+    else if (ichimoku.priceVsCloud === "BELOW") sell += 2;
+    else neutral += 2; // INSIDE
+  } else { neutral += 2; }
 
-  // 9: Ichimoku TK Cross
+  // 9: Ichimoku TK Cross (1x — zaten cloud ile birlikte güçlü)
   if (ichimoku?.tkCross) {
     if (ichimoku.tkCross === "BULLISH") buy++;
     else if (ichimoku.tkCross === "BEARISH") sell++;
@@ -187,25 +187,31 @@ function castMAVotes(t: Record<string, unknown>, extra: VerdictInput["extraIndic
 function castOscillatorVotes(t: Record<string, unknown>, extra: VerdictInput["extraIndicators"]): VoteGroup {
   let buy = 0, sell = 0, neutral = 0;
 
-  // 1: RSI(14)
+  // 1: RSI + Stochastic (tek grup — korelasyon ~0.7-0.8, çift sayımı önle)
+  // İkisinin ortalamasını alıp 1 oy olarak say
   const rsi = num(t.rsi14);
   const rsiBullDiv = bool(t.rsiBullishDivergence);
   const rsiBearDiv = bool(t.rsiBearishDivergence);
-  if (rsi != null) {
-    if (rsi < 30 || (rsi < 50 && rsiBullDiv)) buy++;
-    else if (rsi > 70 || (rsi > 50 && rsiBearDiv)) sell++;
-    else if (rsi >= 40 && rsi <= 60) neutral++;
-    else if (rsi < 40) buy++; // 30-40 leaning bullish
-    else sell++; // 60-70 leaning bearish
-  } else { neutral++; }
-
-  // 2: Stochastic %K
   const stochK = num(t.stochK);
-  if (stochK != null) {
-    if (stochK < 20) buy++;
-    else if (stochK > 80) sell++;
+  {
+    let rsiVote = 0; // -1, 0, +1
+    if (rsi != null) {
+      if (rsi < 30 || (rsi < 50 && rsiBullDiv)) rsiVote = 1;
+      else if (rsi > 70 || (rsi > 50 && rsiBearDiv)) rsiVote = -1;
+      else if (rsi < 40) rsiVote = 1;
+      else if (rsi > 60) rsiVote = -1;
+    }
+    let stochVote = 0;
+    if (stochK != null) {
+      if (stochK < 20) stochVote = 1;
+      else if (stochK > 80) stochVote = -1;
+    }
+    // Ortalama oy (ikisi uyumluysa güçlü, çelişiyorsa nötr)
+    const combined = rsiVote + stochVote;
+    if (combined > 0) buy++;
+    else if (combined < 0) sell++;
     else neutral++;
-  } else { neutral++; }
+  }
 
   // 3: MACD Histogram
   const hist = num(t.macdHistogram);
@@ -354,21 +360,35 @@ function calculateFlowPillar(input: VerdictInput): FlowPillar {
   // Macro rating
   const macroRating = input.macroData ? clamp((input.macroData.macroScore - 50) / 50, -1, 1) : 0;
 
-  // MTF rating
+  // MTF rating (yumuşatılmış — pullback'i conflict sayma)
   let mtfRating = 0;
   if (input.multiTimeframe) {
     const { alignment, weekly } = input.multiTimeframe;
     const weeklyBullish = weekly.trend === "STRONG_UP" || weekly.trend === "UP";
     const weeklyBearish = weekly.trend === "STRONG_DOWN" || weekly.trend === "DOWN";
+    const weeklyStrong = weekly.trend === "STRONG_UP" || weekly.trend === "STRONG_DOWN";
     const dir = weeklyBullish ? 1 : weeklyBearish ? -1 : 0;
 
     if (alignment === "STRONG_ALIGNED") mtfRating = dir * 0.8;
     else if (alignment === "ALIGNED") mtfRating = dir * 0.4;
-    else if (alignment === "CONFLICTING") mtfRating = -0.3;
+    else if (alignment === "CONFLICTING") {
+      // Haftalık trend güçlüyse ve günlük ters ise → pullback fırsatı, hafif ceza
+      if (weeklyStrong) mtfRating = dir * 0.15; // pullback in strong trend → slight positive
+      else mtfRating = -0.15; // true conflict → halved penalty (was -0.3)
+    }
     // MIXED → 0
   }
 
-  const rating = signalRating * 0.40 + volumeRating * 0.20 + macroRating * 0.15 + mtfRating * 0.25;
+  // Likidite penaltisi — düşük likiditede flow sinyalleri güvenilmez
+  let liquidityPenalty = 1.0;
+  if (input.riskMetrics) {
+    const liq = input.riskMetrics.liquidityScore ?? 100;
+    if (liq < 15) liquidityPenalty = 0.3;
+    else if (liq < 30) liquidityPenalty = 0.5;
+  }
+
+  const rawRating = signalRating * 0.40 + volumeRating * 0.20 + macroRating * 0.15 + mtfRating * 0.25;
+  const rating = rawRating * liquidityPenalty;
 
   return { rating: clamp(rating, -1, 1), signalRating, volumeRating, macroRating, mtfRating };
 }
@@ -424,8 +444,9 @@ function applyRiskAdjustment(rawScore: number, risk: VerdictInput["riskMetrics"]
 
   penalty = Math.min(penalty, 0.35);
 
+  // Simetrik risk ayarlaması — her iki yöne eşit penalty
   if (rawScore > 0) return rawScore * (1 - penalty);
-  return rawScore * (1 + penalty * 0.5);
+  return rawScore * (1 + penalty);
 }
 
 // ═══════════════════════════════════════
@@ -434,8 +455,8 @@ function applyRiskAdjustment(rawScore: number, risk: VerdictInput["riskMetrics"]
 
 function scoreToAction(score: number): VerdictAction {
   if (score >= 0.50) return "GUCLU_AL";
-  if (score >= 0.15) return "AL";
-  if (score > -0.15) return "TUT";
+  if (score >= 0.20) return "AL";
+  if (score > -0.20) return "TUT";
   if (score > -0.50) return "SAT";
   return "GUCLU_SAT";
 }

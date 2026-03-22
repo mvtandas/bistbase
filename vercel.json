@@ -13,8 +13,24 @@
       "schedule": "30 5 * * 1-5"
     },
     {
+      "path": "/api/cron/track-verdicts",
+      "schedule": "45 18 * * 1-5"
+    },
+    {
       "path": "/api/cron/weekly-report",
       "schedule": "0 19 * * 5"
+    },
+    {
+      "path": "/api/cron/score-change-alerts",
+      "schedule": "0 19 * * 1-5"
+    },
+    {
+      "path": "/api/cron/macro-alerts",
+      "schedule": "0 17 * * 1-5"
+    },
+    {
+      "path": "/api/cron/screener-analysis",
+      "schedule": "0 7,12,17 * * 1-5"
     }
   ]
 }

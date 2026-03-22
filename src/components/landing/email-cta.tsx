@@ -36,20 +36,20 @@ export function EmailCta() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col sm:flex-row gap-3 mt-8 w-full max-w-md mx-auto"
+      className="flex flex-col sm:flex-row gap-3 w-full"
     >
       <Input
         type="email"
         placeholder="E-posta adresiniz"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="h-12 bg-secondary border-border/50 text-foreground placeholder:text-muted-foreground"
+        className="h-12 bg-secondary/50 border-border/30 text-foreground placeholder:text-muted-foreground/50 focus:border-ai-primary/50"
         required
       />
       <Button
         type="submit"
         disabled={loading}
-        className="h-12 px-6 bg-ai-primary hover:bg-ai-primary/90 text-white font-medium"
+        className="h-12 px-6 bg-ai-primary hover:bg-ai-primary/90 text-white font-medium shrink-0"
       >
         {loading ? "Gönderiliyor..." : "Hemen Başla"}
         {!loading && <ArrowRight className="ml-2 h-4 w-4" />}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { ArrowUpDown, TrendingUp, TrendingDown, Minus, Pencil } from "lucide-react";
+import { ArrowUpDown, TrendingUp, TrendingDown, Minus, Pencil, Search, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QUERY_KEYS } from "@/lib/constants";
+import { Sparkline } from "./sparkline";
 import Link from "next/link";
 import type { PortfolioIntelligence } from "@/lib/stock/portfolio-intelligence";
 
@@ -23,9 +24,9 @@ const VERDICT_BADGE: Record<string, { label: string; color: string; icon: typeof
 function SortHeader({ label, sortKey, currentSort, onSort }: { label: string; sortKey: SortKey; currentSort: { key: SortKey; desc: boolean }; onSort: (key: SortKey) => void }) {
   const active = currentSort.key === sortKey;
   return (
-    <button onClick={() => onSort(sortKey)} className={cn("flex items-center gap-0.5 text-[9px] uppercase tracking-wider font-medium", active ? "text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground/70")}>
+    <button onClick={() => onSort(sortKey)} className={cn("flex items-center gap-1 text-[11px] uppercase tracking-wider font-medium whitespace-nowrap", active ? "text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground/80")}>
       {label}
-      <ArrowUpDown className={cn("h-2.5 w-2.5", active && "text-ai-primary")} />
+      <ArrowUpDown className={cn("h-3 w-3", active && "text-ai-primary")} />
     </button>
   );
 }
@@ -35,13 +36,16 @@ interface HoldingsTableProps {
 }
 
 export function HoldingsTable({ onEdit }: HoldingsTableProps) {
-  const { data, isLoading } = useQuery<PortfolioIntelligence>({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, isLoading } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
   });
 
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "compositeScore", desc: true });
+  const [search, setSearch] = useState("");
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const onSort = (key: SortKey) => {
     setSort(prev => prev.key === key ? { key, desc: !prev.desc } : { key, desc: true });
@@ -49,8 +53,8 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-border/40 bg-card/30 p-4 space-y-2">
-        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+      <div className="bento-card p-5 space-y-3">
+        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
       </div>
     );
   }
@@ -58,97 +62,166 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
   if (!data?.holdings?.length) return null;
 
   const hasPosition = data.hasPositionData;
-  const sorted = [...data.holdings].sort((a, b) => {
-    const va = (a as Record<string, unknown>)[sort.key] as number ?? 0;
-    const vb = (b as Record<string, unknown>)[sort.key] as number ?? 0;
+  const sparklineData: Record<string, number[]> = data.sparklineData ?? {};
+
+  let holdings = [...data.holdings];
+
+  // Search filter
+  if (search) {
+    holdings = holdings.filter((h: Holding) =>
+      h.stockCode.toLowerCase().includes(search.toLowerCase())
+    );
+  }
+
+  // Sort
+  const sorted = holdings.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+    const va = (a[sort.key] as number) ?? 0;
+    const vb = (b[sort.key] as number) ?? 0;
     return sort.desc ? vb - va : va - vb;
   });
 
   return (
-    <div className="rounded-xl border border-border/40 bg-card/30 overflow-hidden">
+    <div className="bento-card overflow-hidden animate-slide-up">
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-border/20 flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-foreground">Portföy Holdingleri</span>
-        <span className="text-[9px] text-muted-foreground/40">{data.holdings.length} hisse</span>
+      <div className="px-5 py-3.5 border-b border-border/20 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-foreground">Portföy Holdingleri</span>
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value.toUpperCase())}
+              placeholder="Ara..."
+              className="pl-8 pr-3 py-1.5 rounded-lg border border-border/30 bg-background text-xs text-foreground placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-ai-primary w-32"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground/50">{data.holdings.length} hisse</span>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-[11px]">
+      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+        <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-border/15">
-              <th className="text-left px-4 py-2 text-[9px] text-muted-foreground/50 font-medium uppercase tracking-wider">Hisse</th>
-              <th className="text-right px-2 py-2"><SortHeader label="Değişim" sortKey="changePercent" currentSort={sort} onSort={onSort} /></th>
-              <th className="text-right px-2 py-2"><SortHeader label="Skor" sortKey="compositeScore" currentSort={sort} onSort={onSort} /></th>
-              <th className="text-center px-2 py-2"><SortHeader label="Karar" sortKey="verdictScore" currentSort={sort} onSort={onSort} /></th>
-              <th className="text-right px-2 py-2"><SortHeader label="Ağırlık" sortKey="weight" currentSort={sort} onSort={onSort} /></th>
-              {hasPosition && <th className="text-right px-2 py-2"><SortHeader label="K/Z" sortKey="pnlPercent" currentSort={sort} onSort={onSort} /></th>}
-              <th className="w-8"></th>
+              <th className="text-left px-5 py-2.5 text-[11px] text-muted-foreground/60 font-medium uppercase tracking-wider">Hisse</th>
+              <th className="px-2 py-2.5 w-16">Grafik</th>
+              <th className="text-right px-3 py-2.5"><SortHeader label="Değişim" sortKey="changePercent" currentSort={sort} onSort={onSort} /></th>
+              <th className="text-right px-3 py-2.5"><SortHeader label="Skor" sortKey="compositeScore" currentSort={sort} onSort={onSort} /></th>
+              <th className="text-center px-3 py-2.5"><SortHeader label="Karar" sortKey="verdictScore" currentSort={sort} onSort={onSort} /></th>
+              <th className="text-right px-3 py-2.5"><SortHeader label="Ağırlık" sortKey="weight" currentSort={sort} onSort={onSort} /></th>
+              {hasPosition && <th className="text-right px-3 py-2.5"><SortHeader label="K/Z" sortKey="pnlPercent" currentSort={sort} onSort={onSort} /></th>}
+              <th className="w-16" />
             </tr>
           </thead>
           <tbody>
-            {sorted.map(h => {
+            {sorted.map((h: Holding) => {
               const vb = h.verdictAction ? VERDICT_BADGE[h.verdictAction] : null;
               const VIcon = vb?.icon ?? Minus;
+              const isExpanded = expandedRow === h.stockCode;
+              const sparkData = sparklineData[h.stockCode] ?? [];
+
               return (
-                <tr key={h.stockCode} className="border-b border-border/10 hover:bg-card/40 transition-colors">
-                  <td className="px-4 py-2.5">
-                    <Link href={`/dashboard/stock/${h.stockCode}`} className="hover:text-ai-primary transition-colors">
-                      <span className="font-bold text-foreground">{h.stockCode}</span>
-                      {h.price != null && <span className="text-muted-foreground/50 ml-1.5 tabular-nums">₺{h.price.toFixed(2)}</span>}
-                    </Link>
-                  </td>
-                  <td className="text-right px-2 py-2.5 tabular-nums">
-                    {h.changePercent != null && (
-                      <span className={cn("font-medium", h.changePercent >= 0 ? "text-gain" : "text-loss")}>
-                        {h.changePercent >= 0 ? "+" : ""}{h.changePercent.toFixed(2)}%
-                      </span>
-                    )}
-                  </td>
-                  <td className="text-right px-2 py-2.5">
-                    {h.compositeScore != null && (
-                      <span className={cn("font-bold tabular-nums", h.compositeScore >= 60 ? "text-gain" : h.compositeScore >= 45 ? "text-amber-400" : "text-loss")}>
-                        {h.compositeScore}
-                      </span>
-                    )}
-                  </td>
-                  <td className="text-center px-2 py-2.5">
-                    {vb && (
-                      <span className={cn("inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full", vb.color)}>
-                        <VIcon className="h-2.5 w-2.5" />
-                        {vb.label}
-                      </span>
-                    )}
-                  </td>
-                  <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
-                    %{h.weight}
-                  </td>
-                  {hasPosition && (
-                    <td className="text-right px-2 py-2.5 tabular-nums">
-                      {h.pnl != null ? (
-                        <div>
-                          <span className={cn("font-medium", h.pnl >= 0 ? "text-gain" : "text-loss")}>
-                            {h.pnl >= 0 ? "+" : ""}₺{h.pnl.toLocaleString("tr-TR")}
-                          </span>
-                          {h.pnlPercent != null && (
-                            <span className="text-muted-foreground/40 ml-1 text-[9px]">
-                              ({h.pnlPercent > 0 ? "+" : ""}{h.pnlPercent}%)
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground/30">—</span>
+                <React.Fragment key={h.stockCode}>
+                  <tr
+                    className={cn("border-b border-border/10 hover:bg-card/40 transition-colors cursor-pointer", isExpanded && "bg-card/30")}
+                    onClick={() => setExpandedRow(isExpanded ? null : h.stockCode)}
+                  >
+                    <td className="px-5 py-3">
+                      <Link href={`/dashboard/stock/${h.stockCode}`} className="hover:text-ai-primary transition-colors" onClick={e => e.stopPropagation()}>
+                        <span className="font-bold text-foreground text-sm">{h.stockCode}</span>
+                        {h.price != null && <span className="text-muted-foreground/60 ml-2 tabular-nums">₺{h.price.toFixed(2)}</span>}
+                      </Link>
+                    </td>
+                    <td className="px-2 py-3">
+                      {sparkData.length > 1 && <Sparkline data={sparkData} width={60} height={28} />}
+                    </td>
+                    <td className="text-right px-3 py-3 tabular-nums">
+                      {h.changePercent != null && (
+                        <span className={cn("font-semibold", h.changePercent >= 0 ? "text-gain" : "text-loss")}>
+                          {h.changePercent >= 0 ? "+" : ""}{h.changePercent.toFixed(2)}%
+                        </span>
                       )}
                     </td>
-                  )}
-                  <td className="px-2 py-2.5">
-                    {onEdit && (
-                      <button onClick={() => onEdit(h.stockCode)} className="p-1 rounded hover:bg-card/50 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors">
-                        <Pencil className="h-3 w-3" />
-                      </button>
+                    <td className="text-right px-3 py-3">
+                      {h.compositeScore != null && (
+                        <span className={cn("font-bold tabular-nums text-sm", h.compositeScore >= 60 ? "text-gain" : h.compositeScore >= 45 ? "text-amber-400" : "text-loss")}>
+                          {h.compositeScore}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-center px-3 py-3">
+                      {vb && (
+                        <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full", vb.color)}>
+                          <VIcon className="h-3 w-3" />
+                          {vb.label}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right px-3 py-3 tabular-nums text-muted-foreground/70">
+                      %{h.weight}
+                    </td>
+                    {hasPosition && (
+                      <td className="text-right px-3 py-3 tabular-nums">
+                        {h.pnl != null ? (
+                          <div>
+                            <span className={cn("font-semibold", h.pnl >= 0 ? "text-gain" : "text-loss")}>
+                              {h.pnl >= 0 ? "+" : ""}₺{h.pnl.toLocaleString("tr-TR")}
+                            </span>
+                            {h.pnlPercent != null && (
+                              <span className="text-muted-foreground/50 ml-1 text-[11px]">
+                                ({h.pnlPercent > 0 ? "+" : ""}{h.pnlPercent}%)
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground/30">—</span>
+                        )}
+                      </td>
                     )}
-                  </td>
-                </tr>
+                    <td className="px-3 py-3 flex items-center gap-1">
+                      {onEdit && (
+                        <button onClick={(e) => { e.stopPropagation(); onEdit(h.stockCode); }} className="p-1.5 rounded-lg hover:bg-card/50 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground/30 transition-transform", isExpanded && "rotate-180")} />
+                    </td>
+                  </tr>
+                  {/* Expanded row */}
+                  {isExpanded && (
+                    <tr key={`${h.stockCode}-expand`} className="border-b border-border/10 bg-card/20">
+                      <td colSpan={hasPosition ? 8 : 7} className="px-5 py-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                          <div>
+                            <span className="text-muted-foreground/60">Sektör</span>
+                            <div className="font-medium text-foreground mt-0.5">{h.sectorCode ?? "—"}</div>
+                          </div>
+                          {h.quantity != null && (
+                            <div>
+                              <span className="text-muted-foreground/60">Miktar</span>
+                              <div className="font-medium text-foreground mt-0.5">{h.quantity} adet</div>
+                            </div>
+                          )}
+                          {h.cost != null && (
+                            <div>
+                              <span className="text-muted-foreground/60">Maliyet</span>
+                              <div className="font-medium text-foreground mt-0.5">₺{h.cost.toLocaleString("tr-TR")}</div>
+                            </div>
+                          )}
+                          {h.value != null && (
+                            <div>
+                              <span className="text-muted-foreground/60">Güncel Değer</span>
+                              <div className="font-medium text-foreground mt-0.5">₺{h.value.toLocaleString("tr-TR")}</div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>

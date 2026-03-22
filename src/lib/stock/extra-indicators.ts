@@ -141,6 +141,7 @@ export function calculateExtraIndicators(bars: HistoricalBar[], bbUpper?: number
   const sarResult = calcParabolicSAR(bars);
   const keltner = calcKeltner(bars);
   const elder = calcElderRay(bars);
+  const kamaValue = calculateKAMA(bars.map(b => b.close));
 
   // TTM Squeeze: Bollinger inside Keltner
   let ttmSqueeze = false;
@@ -160,15 +161,7 @@ export function calculateExtraIndicators(bars: HistoricalBar[], bbUpper?: number
     ttmSqueeze,
     elderBullPower: elder?.bull ?? null,
     elderBearPower: elder?.bear ?? null,
-    kama: (() => {
-      const closes = bars.map(b => b.close);
-      return calculateKAMA(closes);
-    })(),
-    priceVsKama: (() => {
-      const closes = bars.map(b => b.close);
-      const k = calculateKAMA(closes);
-      if (k == null) return null;
-      return price > k ? "ABOVE" : "BELOW";
-    })(),
+    kama: kamaValue,
+    priceVsKama: kamaValue != null ? (price > kamaValue ? "ABOVE" : "BELOW") : null,
   };
 }

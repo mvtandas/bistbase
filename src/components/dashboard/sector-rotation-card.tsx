@@ -26,10 +26,12 @@ export function SectorRotationCard() {
 
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-border/40 bg-card/30 p-4 mb-5 animate-pulse">
-        <div className="h-3 w-32 bg-muted rounded mb-3" />
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => <div key={i} className="h-4 w-full bg-muted rounded" />)}
+      <div className="bento-card animate-pulse">
+        <div className="bento-card-header"><div className="h-4 w-32 bg-muted rounded" /></div>
+        <div className="bento-card-body">
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <div key={i} className="h-4 w-full bg-muted rounded" />)}
+          </div>
         </div>
       </div>
     );
@@ -41,11 +43,12 @@ export function SectorRotationCard() {
   if (withData.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-border/40 bg-card/30 p-4 mb-5">
-      <div className="flex items-center gap-2 mb-3">
-        <RefreshCw className="h-3.5 w-3.5 text-ai-primary" />
-        <span className="text-[11px] font-medium text-muted-foreground/60 uppercase tracking-wider">Sektör Rotasyonu</span>
+    <div className="bento-card animate-slide-up">
+      <div className="bento-card-header">
+        <RefreshCw className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Sektör Rotasyonu</span>
       </div>
+      <div className="bento-card-body">
       <div className="space-y-1.5">
         {withData.map((s) => {
           const isPositive = (s.change1W ?? 0) >= 0;
@@ -73,6 +76,7 @@ export function SectorRotationCard() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

@@ -2,8 +2,224 @@
  * Shared constants
  */
 
+/** Set to false to re-enable premium plan enforcement */
+export const BETA_MODE = true;
+
+// ═══ BİST Endeks Listeleri ═══
+
+export type ScreenerIndex = "bist30" | "bist50" | "bist100" | "bistall" | "xtm25" | "xkury" | "xusrd";
+
+// BİST30 — Türkiye'nin en likit 30 hissesi
+export const BIST30: readonly string[] = [
+  "AKBNK", "ARCLK", "ASELS", "BIMAS", "EKGYO",
+  "ENERY", "EREGL", "FROTO", "GARAN", "GUBRF",
+  "HEKTS", "ISCTR", "KCHOL", "KOZAA", "KOZAL",
+  "KRDMD", "MGROS", "ODAS", "OYAKC", "PETKM",
+  "PGSUS", "SAHOL", "SASA", "SISE", "TAVHL",
+  "TCELL", "THYAO", "TOASO", "TUPRS", "YKBNK",
+];
+
+// BİST50 — BIST30 + 20 ek likit hisse
+export const BIST50: readonly string[] = [
+  ...BIST30,
+  "AEFES", "AKSA", "ALARK", "CIMSA", "DOHOL",
+  "EGEEN", "ENKAI", "GESAN", "ISGYO", "KONTR",
+  "LOGO", "MPARK", "OTKAR", "QUAGR", "SKBNK",
+  "SMRTG", "SOKM", "TTKOM", "ULKER", "VESTL",
+];
+
+// BİST100 — BIST50 + 50 ek hisse
+export const BIST100: readonly string[] = [
+  ...BIST50,
+  "ADEL", "AGESA", "AGHOL", "AKFGY", "AKSEN",
+  "ALFAS", "ALKIM", "ANSGR", "AYGAZ", "BASGZ",
+  "BIOEN", "BRISA", "BRYAT", "BUCIM", "CCOLA",
+  "DOAS", "ECILC", "ENJSA", "EUPWR", "GENIL",
+  "GLYHO", "HALKB", "INDES", "IPEKE", "ISMEN",
+  "KAREL", "KARSN", "KLRHO", "KMPUR", "KORDS",
+  "KTLEV", "MAVI", "NETAS", "PAPIL", "PEKGY",
+  "POLHO", "PRKME", "RGYAS", "SANEL", "SELEC",
+  "TGSAS", "TKFEN", "TMSN", "TRGYO", "TURSG",
+  "VAKBN", "YEOTK", "AYEN", "TATGD", "CLEBI",
+];
+
+// BİST Tüm Piyasa — BIST100 + YıldızPazar + Ana Pazar + Alt Pazar + GİP aktif hisseler
+export const BIST_ALL: readonly string[] = [
+  ...BIST100,
+  // YıldızPazar & Ana Pazar ek hisseler
+  "ACSEL", "AHGAZ", "AKBNK", "AKCNS", "AKFYE",
+  "AKMGY", "AKSGY", "ALCAR", "ALCTL", "ALGYO",
+  "ALTNY", "ANHYT", "ARSAN", "ARZUM", "ASTOR",
+  "ASUZU", "ATAGY", "ATAKP", "ATATP", "AVHOL",
+  "AYCES", "AYDEM", "BAKAN", "BANVT", "BERA",
+  "BFREN", "BINHO", "BMELK", "BMSTL", "BNTAS",
+  "BRLSM", "BTCIM", "BURCE", "CASA", "CEMAS",
+  "CMENT", "CUSAN", "CVKMD", "DAPGM", "DESA",
+  "DGATE", "DGNMO", "DIRIT", "DITAS", "DJIST",
+  "DMRGD", "DNISI", "DURDO", "DYOBY", "EDATA",
+  "EDIP", "EMKEL", "ENSRI", "EPLAS", "ERBOS",
+  "ESEN", "ETILR", "EUREN", "FADE", "FLAP",
+  "FMIZP", "FONET", "FORMT", "FRIGO", "GARAN",
+  "GEDIK", "GENTS", "GLBMD", "GLCVY", "GOKNR",
+  "GOLTS", "GOODY", "GSDHO", "GSRAY", "GWIND",
+  "HATEK", "HDFGS", "HEDEF", "HKTM", "HTTBT",
+  "HUBVC", "HUNER", "IDEAS", "IHEVA", "IHLGM",
+  "IHYAY", "IMASM", "INTEM", "INVEO", "ISATR",
+  "ISDMR", "ISFIN", "IZENR", "JANTS", "KAYSE",
+  "KCAER", "KFEIN", "KGYO", "KLKIM", "KLMSN",
+  "KLSER", "KNFRT", "KONYA", "KOPOL", "KRONT",
+  "KRPLS", "KRVGD", "KUTPO", "KUYAS", "LIDER",
+  "LILAK", "LKMNH", "LUKSK", "MAALT", "MACKO",
+  "MAGEN", "MAKIM", "MANAS", "MEGAP", "MEPET",
+  "MERCN", "MERKO", "MIATK", "MMCAS", "MOBTL",
+  "MRGYO", "MTRKS", "MTRYO", "NUGYO", "NUHCM",
+  "OBASE", "OFSYM", "ONCSM", "ORCAY", "ORGE",
+  "OSMEN", "OSTIM", "OYYAT", "OZGYO", "OZKGY",
+  "PAMEL", "PCILT", "PENGD", "PENTA", "PETUN",
+  "PINSU", "PKART", "PLTUR", "PNLSN", "POLTK",
+  "PRZMA", "PSDTC", "RALYH", "RODRG", "RTALB",
+  "RUBNS", "RYGYO", "RYSAS", "SAMAT", "SASA",
+  "SDTTR", "SEKFK", "SEKUR", "SILVR", "SKYLP",
+  "SMART", "SNGYO", "SNPAM", "SODSN", "SRVGY",
+  "TABGD", "TBORG", "TDGYO", "TEKTU", "TEMPO",
+  "TETMT", "TLMAN", "TMPOL", "TNZTP", "TRCAS",
+  "TRILC", "TSGYO", "TTRAK", "TUKAS", "TUREX",
+  "UFUK", "ULAS", "ULUUN", "USAK", "VBTYZ",
+  "VERTU", "VERUS", "VKGYO", "YATAS", "YGYO",
+  "YKSLN", "YUNSA", "ZEDUR", "ZOREN",
+  // Alt Pazar hisseleri
+  "ADANA", "ADNAC", "AFYON", "AKENR", "ALKA",
+  "ARENA", "ARMDA", "AVOD", "BAGFS", "BAKAB",
+  "BALAT", "BARMA", "BESUN", "BEYAZ", "BLCYT",
+  "BMSCH", "BOSSA", "BRMEN", "BRSAN", "CANTE",
+  "CELHA", "CMBTN", "DAGHL", "DERIM", "DESPC",
+  "DGKLB", "DMSAS", "DOBUR", "DOKTA", "EGPRO",
+  "EMNIS", "EYGYO", "GARFA", "GRNYO", "GSDDE",
+  "GUSGR", "HURGZ", "IZFAS", "IZOCM", "KAPLM",
+  "KARYE", "KENT", "KERVT", "KIMMR", "KLNMA",
+  "KRTEK", "LINK", "MAKTK", "MNDRS", "MRSHL",
+  "NTGAZ", "NTHOL", "OLMIP", "OYAYO", "OZBAL",
+  "PARSN", "PNSUT", "RAYSG", "ROYAL", "SAYAS",
+  "SEGYO", "SELGD", "SERVE", "SKTAS", "SNKRN",
+  "SUMAS", "SURGY", "TKURU", "TSPOR", "TUCLK",
+  "ULUSE", "VANGD", "YAPRK", "YGGYO", "ZRGYO",
+  // GİP (Gelişen İşletmeler Pazarı)
+  "ALVES", "ARTMS", "ATSYH", "BJKAS", "DARDL",
+  "EKIZ", "ERSU", "ETYAT", "FENER", "GIPTA",
+  "GZNMI", "HALIT", "INGRM", "ISKPL", "KATMR",
+  "KUVVA", "MEGMT",
+  // Yıldız Pazar ek hisseler
+  "ARDYZ", "ATLAS", "AVGYO", "BSOKE", "CATES",
+  "CEOEM", "CONSE", "CWENE", "DAGI", "DENGE",
+  "EGEPO", "EKSUN", "EMPEL", "ENTRA", "ERCB",
+  "EUHOL", "EUYO", "EVREN", "FZLGY", "GCMYO",
+  "GEDZA", "GLRYH", "GOZDE", "GRSEL", "ICBCT",
+  "IEYHO", "IHGZT", "ISKUR", "ISGSY", "ITTFH",
+  "IZMDC", "KZBGY", "LIDFA", "LRSHO", "MEGIP",
+  "METUR", "MIPAZ", "MNDTR", "MSGYO", "NATEN",
+  "NIBAS", "OBAMS", "ODINE", "ONRYT", "ORMA",
+  "OTTO", "PRDGS", "REEDR", "SAFKR", "SANFM",
+  "SELVA", "SNICA", "SUWEN", "TACTR", "TATEN",
+  "TIRE", "TORUNL", "TURGG", "UHRGY", "VAKFN",
+  "VESBE", "VRGYO", "YYLGD",
+  // Ana Pazar ek hisseler
+  "AGROT", "AHSGY", "AKGRT", "AKMGY", "AKSUE",
+  "ALBRK", "ALCTL", "ANELE", "ANGEN", "ARCLK",
+  "ARDYZ", "ATATP", "AVGYO", "BAYRK", "BFREN",
+  "BIGCH", "BIENY", "BORLS", "BRKVY", "BURVA",
+  "CANTE", "CCOLA", "COSMO", "CRDFA", "DAPGM",
+  "DERHL", "DGGYO", "DURDO", "ECILC", "EGOS",
+  "EKGYO", "EKOS", "ELITE", "EMKEL", "EMNIS",
+  "ENERY", "EPLAS", "EUPWR", "EYGYO", "FONET",
+  "FROTO", "GARAN", "GARFA", "GEDIK", "GENIL",
+  "GENTS", "GLCVY", "GOKNR", "GOLTS", "GOODY",
+  "GRTRK", "GSDDE", "GSDHO", "GSRAY", "GWIND",
+  "HATEK", "HDFGS", "HEDEF", "HKTM", "HTTBT",
+  "HUBVC", "HUNER", "IDEAS", "IHEVA", "IHLGM",
+  "IHYAY", "IMASM", "INTEM", "INVEO", "ISATR",
+  "ISDMR", "ISFIN", "IZENR", "JANTS", "KAYSE",
+  "KCAER", "KFEIN", "KGYO", "KLKIM", "KLMSN",
+  "KLSER", "KNFRT", "KONYA", "KOPOL", "KRONT",
+  "KRPLS", "KRVGD", "KUTPO", "KUYAS", "LIDER",
+  "LILAK", "LKMNH", "LUKSK", "MAALT", "MACKO",
+  "MAGEN", "MAKIM", "MANAS", "MEGAP", "MEPET",
+  "MERCN", "MERKO", "MIATK", "MMCAS", "MOBTL",
+  "MRGYO", "MTRKS", "MTRYO", "NUGYO", "NUHCM",
+  "OBASE", "OFSYM", "ONCSM", "ORCAY", "ORGE",
+  "OSMEN", "OSTIM", "OYYAT", "OZGYO", "OZKGY",
+  "PAMEL", "PCILT", "PENGD", "PENTA", "PETUN",
+  "PINSU", "PKART", "PLTUR", "PNLSN", "POLTK",
+  "PRZMA", "PSDTC", "RALYH", "RODRG", "RTALB",
+  "RUBNS", "RYGYO", "RYSAS", "SAMAT", "SDTTR",
+  "SEKFK", "SEKUR", "SILVR", "SKYLP", "SMART",
+  "SNGYO", "SNPAM", "SODSN", "SRVGY", "TABGD",
+  "TBORG", "TDGYO", "TEKTU", "TEMPO", "TETMT",
+  "TLMAN", "TMPOL", "TNZTP", "TRCAS", "TRILC",
+  "TSGYO", "TTRAK", "TUKAS", "TUREX", "UFUK",
+  "ULAS", "ULUUN", "USAK", "VBTYZ", "VERTU",
+  "VERUS", "VKGYO", "YATAS", "YGYO", "YKSLN",
+  "YUNSA", "ZEDUR", "ZOREN",
+  // Yakın İzleme & Diğer aktif hisseler
+  "ANGEN", "BAYRK", "BIGCH", "BIENY", "BORLS",
+  "BRKVY", "BURVA", "COSMO", "CRDFA", "DERHL",
+  "DGGYO", "EGOS", "EKOS", "ELITE", "GRTRK",
+  "INGRM", "ISKPL", "KATMR", "KUVVA", "MEGMT",
+  "MRSHL", "RAYSG", "ROYAL", "SAYAS", "SEGYO",
+  "SELGD", "SERVE", "SNKRN", "SUMAS", "SURGY",
+  "TKURU", "TSPOR", "TUCLK", "ULUSE", "VANGD",
+  "YAPRK", "YGGYO", "ZRGYO",
+].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+
+// BİST Temettü 25 — Yüksek temettü veren hisseler
+export const BIST_TEMETTU25: readonly string[] = [
+  "AKBNK", "AEFES", "ARCLK", "BIMAS", "CCOLA",
+  "DOAS", "ENKAI", "EREGL", "FROTO", "GARAN",
+  "ISCTR", "KCHOL", "MGROS", "OTKAR", "PETKM",
+  "PGSUS", "SAHOL", "SISE", "TCELL", "THYAO",
+  "TOASO", "TTKOM", "TUPRS", "ULKER", "YKBNK",
+];
+
+// BİST Kurumsal Yönetim — Kurumsal yönetim endeksi
+export const BIST_KURUMSAL: readonly string[] = [
+  "AKBNK", "AEFES", "ARCLK", "ASELS", "BIMAS",
+  "CCOLA", "DOAS", "ENKAI", "EREGL", "FROTO",
+  "GARAN", "HALKB", "ISCTR", "KCHOL", "MGROS",
+  "OTKAR", "PETKM", "PGSUS", "SAHOL", "SISE",
+  "TAVHL", "TCELL", "THYAO", "TOASO", "TTKOM",
+  "TUPRS", "ULKER", "VAKBN", "VESTL", "YKBNK",
+];
+
+// BİST Sürdürülebilirlik — Sürdürülebilirlik endeksi
+export const BIST_SURDURULEBILIRLIK: readonly string[] = [
+  "AKBNK", "ARCLK", "ASELS", "BIMAS", "BRISA",
+  "CCOLA", "ENKAI", "EREGL", "FROTO", "GARAN",
+  "HALKB", "ISCTR", "KCHOL", "KORDS", "MGROS",
+  "OTKAR", "PETKM", "SAHOL", "SISE", "TAVHL",
+  "TCELL", "THYAO", "TOASO", "TTKOM", "TUPRS",
+  "ULKER", "VAKBN", "VESTL", "YKBNK", "LOGO",
+];
+
+// Endeks → hisse listesi eşlemesi
+export const STOCK_LISTS: Record<ScreenerIndex, readonly string[]> = {
+  bist30: BIST30,
+  bist50: BIST50,
+  bist100: BIST100,
+  bistall: BIST_ALL,
+  xtm25: BIST_TEMETTU25,
+  xkury: BIST_KURUMSAL,
+  xusrd: BIST_SURDURULEBILIRLIK,
+};
+
 export const QUERY_KEYS = {
   PORTFOLIO_INTELLIGENCE: ["portfolio-intelligence"] as const,
   PORTFOLIO_RISK: ["portfolio-risk"] as const,
   SECTOR_ROTATION: ["sector-rotation"] as const,
+  PORTFOLIO_EQUITY_CURVE: ["portfolio-equity-curve"] as const,
+  PORTFOLIO_HISTORY: ["portfolio-history"] as const,
+  PORTFOLIO_MONTE_CARLO: ["portfolio-monte-carlo"] as const,
+  SCREENER: ["screener"] as const,
+  MACRO: ["macro"] as const,
+  MARKET_SENTIMENT: ["market-sentiment"] as const,
+  MARKET_OVERVIEW: ["market-overview"] as const,
+  PORTFOLIO_NEWS: ["portfolio-news"] as const,
 } as const;

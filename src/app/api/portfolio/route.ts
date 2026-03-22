@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { BETA_MODE } from "@/lib/constants";
 
 // GET: List user's portfolio
 export async function GET() {
@@ -34,21 +35,23 @@ export async function POST(request: NextRequest) {
 
   const code = stockCode.replace(".IS", "").toUpperCase();
 
-  // Check FREE plan limit (max 2 stocks)
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { plan: true },
-  });
-
-  if (user?.plan === "FREE") {
-    const count = await prisma.portfolio.count({
-      where: { userId: session.user.id },
+  // Check FREE plan limit (max 2 stocks) - disabled in beta
+  if (!BETA_MODE) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { plan: true },
     });
-    if (count >= 2) {
-      return NextResponse.json(
-        { error: "PREMIUM_REQUIRED", message: "Ücretsiz planda maksimum 2 hisse takip edebilirsiniz." },
-        { status: 403 }
-      );
+
+    if (user?.plan === "FREE") {
+      const count = await prisma.portfolio.count({
+        where: { userId: session.user.id },
+      });
+      if (count >= 2) {
+        return NextResponse.json(
+          { error: "PREMIUM_REQUIRED", message: "Ücretsiz planda maksimum 2 hisse takip edebilirsiniz." },
+          { status: 403 }
+        );
+      }
     }
   }
 

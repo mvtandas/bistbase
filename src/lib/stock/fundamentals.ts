@@ -247,10 +247,11 @@ function scoreValuation(f: FundamentalData): number {
 function scoreProfitability(f: FundamentalData): number {
   let score = 50;
 
+  // ROE: Türkiye'de %20+ enflasyon nedeniyle eşikler yükseltildi
   if (f.roe != null) {
-    if (f.roe > 25) score += 20;
-    else if (f.roe > 15) score += 10;
-    else if (f.roe > 8) score += 5;
+    if (f.roe > 30) score += 20;    // Enflasyon üstü güçlü getiri
+    else if (f.roe > 20) score += 10;
+    else if (f.roe > 10) score += 5;
     else if (f.roe < 0) score -= 20;
     else score -= 5;
   }
@@ -293,12 +294,12 @@ function scoreGrowth(f: FundamentalData): number {
 function scoreHealth(f: FundamentalData): number {
   let score = 50;
 
-  // Borç/Özsermaye: düşük = iyi
+  // Borç/Özsermaye: sektöre göre farklı eşikler ideal ama genel BIST ortalamasına göre ayarlı
   if (f.debtToEquity != null) {
-    if (f.debtToEquity < 30) score += 15;
-    else if (f.debtToEquity < 80) score += 5;
-    else if (f.debtToEquity > 150) score -= 15;
-    else if (f.debtToEquity > 100) score -= 5;
+    if (f.debtToEquity < 50) score += 15;       // Güçlü bilanço
+    else if (f.debtToEquity < 100) score += 5;   // Makul
+    else if (f.debtToEquity > 200) score -= 15;  // Çok yüksek (bankalar hariç)
+    else if (f.debtToEquity > 150) score -= 5;
   }
 
   // Cari oran: > 1.5 iyi

@@ -8,21 +8,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { BIST30 } from "@/lib/constants";
 import { getHistoricalBars } from "@/lib/stock/yahoo";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
 import { detectSignals } from "@/lib/stock/signals";
 
 export const maxDuration = 300; // 5 min timeout
-
-// BİST30 — Türkiye'nin en likit 30 hissesi
-const BIST30 = [
-  "AKBNK", "ARCLK", "ASELS", "BIMAS", "EKGYO",
-  "ENERY", "EREGL", "FROTO", "GARAN", "GUBRF",
-  "HEKTS", "ISCTR", "KCHOL", "KOZAA", "KOZAL",
-  "KRDMD", "MGROS", "ODAS", "OYAKC", "PETKM",
-  "PGSUS", "SAHOL", "SASA", "SISE", "TAVHL",
-  "TCELL", "THYAO", "TOASO", "TUPRS", "YKBNK",
-];
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 

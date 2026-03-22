@@ -9,7 +9,19 @@ export default async function StockDetailPage({
 }) {
   const { code } = await params;
   const stockCode = code.toUpperCase();
-  await auth();
+  const session = await auth();
+
+  // Check if user accepted AI disclaimer
+  let aiDisclaimerAccepted = false;
+  if (session?.user?.id) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { aiDisclaimerAccepted: true },
+      });
+      aiDisclaimerAccepted = user?.aiDisclaimerAccepted ?? false;
+    } catch { /* silent */ }
+  }
 
   let serializedSummaries: {
     id: string; date: string; closePrice: number | null; changePercent: number | null;
@@ -50,6 +62,7 @@ export default async function StockDetailPage({
     <StockDetailClient
       stockCode={stockCode}
       summaries={serializedSummaries}
+      aiDisclaimerAccepted={aiDisclaimerAccepted}
     />
   );
 }

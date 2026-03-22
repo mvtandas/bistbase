@@ -9,7 +9,7 @@ export function DashboardClient() {
 
   return (
     <>
-      <div className="mb-4">
+      <div className="min-w-0 overflow-hidden">
         <HoldingsTable onEdit={setEditStock} />
       </div>
 

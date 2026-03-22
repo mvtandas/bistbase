@@ -33,9 +33,6 @@ export default async function OnboardingPage() {
         <p className="text-muted-foreground mt-2">
           Portföyünüze eklemek istediğiniz BİST hisselerini arayın ve seçin.
         </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Ücretsiz planda 2 hisse takip edebilirsiniz.
-        </p>
       </div>
 
       <StockSearch />

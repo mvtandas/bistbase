@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runDailyAnalysis } from "@/lib/cron/analyze";
 
+export const maxDuration = 300;
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
 

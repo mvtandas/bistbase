@@ -87,3 +87,70 @@ export function buildSignalAlertHtml(stockCode: string, signals: {
       <p style="margin-top:16px;font-size:10px;color:#475569">Bu analiz yatırım danışmanlığı kapsamında değildir (YTD).</p>
     </div>`;
 }
+
+// Şablon: Skor Değişim Alerti
+export function buildScoreChangeAlertHtml(alerts: {
+  stockCode: string;
+  oldScore: number;
+  newScore: number;
+  verdict: string | null;
+}[]): string {
+  const rows = alerts.map((a) => {
+    const diff = a.newScore - a.oldScore;
+    const color = diff > 0 ? "#34d399" : "#fb7185";
+    const arrow = diff > 0 ? "↑" : "↓";
+    const verdictLabel = a.verdict ?? "—";
+    return `
+      <tr style="border-bottom:1px solid #1e293b">
+        <td style="padding:10px 8px;font-weight:700;color:#f8fafc">${a.stockCode}</td>
+        <td style="padding:10px 8px;color:#94a3b8">${a.oldScore}</td>
+        <td style="padding:10px 8px;color:${color};font-weight:700">${arrow} ${a.newScore}</td>
+        <td style="padding:10px 8px;color:${color};font-weight:600">${diff > 0 ? "+" : ""}${diff.toFixed(0)}</td>
+        <td style="padding:10px 8px;color:#94a3b8;font-size:12px">${verdictLabel}</td>
+      </tr>`;
+  }).join("");
+
+  return `
+    <div style="font-family:system-ui,sans-serif;max-width:500px;margin:0 auto;background:#0a0a0f;color:#f8fafc;padding:24px;border-radius:12px">
+      <h2 style="margin:0 0 4px;font-size:18px;color:#818cf8">bistbase</h2>
+      <p style="margin:0 0 16px;color:#64748b;font-size:13px">Skor Değişim Alarmı</p>
+      <p style="margin:0 0 12px;color:#f8fafc;font-size:14px">Portföyünüzdeki ${alerts.length} hissede önemli skor değişimi:</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="border-bottom:2px solid #334155">
+          <th style="text-align:left;padding:8px;color:#64748b">Hisse</th>
+          <th style="text-align:left;padding:8px;color:#64748b">Eski</th>
+          <th style="text-align:left;padding:8px;color:#64748b">Yeni</th>
+          <th style="text-align:left;padding:8px;color:#64748b">Fark</th>
+          <th style="text-align:left;padding:8px;color:#64748b">Karar</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin-top:16px;font-size:10px;color:#475569">Bu analiz yatırım danışmanlığı kapsamında değildir (YTD).</p>
+    </div>`;
+}
+
+// Şablon: Makro Alert
+export function buildMacroAlertHtml(alerts: {
+  type: string;
+  label: string;
+  value: number;
+  change: number;
+}[]): string {
+  const rows = alerts.map((a) => {
+    const color = a.change > 0 ? "#fb7185" : "#34d399";
+    return `<div style="padding:8px 12px;margin:4px 0;background:#1a1a2e;border-radius:6px;border-left:3px solid ${color}">
+      <span style="color:#f8fafc;font-weight:600;font-size:13px">${a.label}</span>
+      <span style="color:${color};font-weight:700;font-size:13px;margin-left:8px">${a.change > 0 ? "+" : ""}${a.change.toFixed(2)}%</span>
+      <p style="margin:2px 0 0;color:#64748b;font-size:11px">Güncel: ${a.value.toFixed(2)}</p>
+    </div>`;
+  }).join("");
+
+  return `
+    <div style="font-family:system-ui,sans-serif;max-width:500px;margin:0 auto;background:#0a0a0f;color:#f8fafc;padding:24px;border-radius:12px">
+      <h2 style="margin:0 0 4px;font-size:18px;color:#818cf8">bistbase</h2>
+      <p style="margin:0 0 16px;color:#64748b;font-size:13px">Makro Piyasa Alarmı</p>
+      <p style="margin:0 0 12px;color:#f8fafc;font-size:14px">Önemli makro hareketler tespit edildi:</p>
+      ${rows}
+      <p style="margin-top:16px;font-size:10px;color:#475569">Bu analiz yatırım danışmanlığı kapsamında değildir (YTD).</p>
+    </div>`;
+}

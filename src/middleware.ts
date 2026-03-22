@@ -12,12 +12,17 @@ export async function middleware(request: NextRequest) {
   const isAuth = !!token;
 
   // Protected routes
-  const protectedPaths = ["/dashboard", "/onboarding"];
+  const protectedPaths = ["/dashboard", "/onboarding", "/admin"];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtected && !isAuth) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin routes: require ADMIN role
+  if (pathname.startsWith("/admin") && token?.role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   // Redirect authenticated users from login to dashboard
@@ -30,5 +35,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/onboarding", "/login"],
+  matcher: ["/dashboard/:path*", "/onboarding", "/login", "/admin/:path*"],
 };

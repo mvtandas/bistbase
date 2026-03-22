@@ -4,16 +4,21 @@ import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { MetricCard } from "@/components/ui/metric-card";
 import * as I from "@/lib/stock/interpretations";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { SectionHeader } from "@/components/stock-detail/shared";
+import { AiInsightCard } from "@/components/stock-detail/AiInsightCard";
 import type { StockDetail } from "@/components/stock-detail/types";
+import type { RiskSenaryoOutput } from "@/lib/ai/types";
 
 interface RiskTabProps {
   d: StockDetail;
   timeLabel: "realtime" | "daily" | "weekly" | "monthly";
+  riskSenaryo: RiskSenaryoOutput | null;
+  rsLoading: boolean;
+  rsError: boolean;
 }
 
-export function RiskTab({ d, timeLabel }: RiskTabProps) {
+export function RiskTab({ d, timeLabel, riskSenaryo, rsLoading, rsError }: RiskTabProps) {
   const rm = d.riskMetrics;
 
   if (!rm) {
@@ -25,7 +30,7 @@ export function RiskTab({ d, timeLabel }: RiskTabProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
 
       {/* Risk Profile */}
       <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -78,6 +83,41 @@ export function RiskTab({ d, timeLabel }: RiskTabProps) {
         </div>
       </div>
 
+      {/* Risk Senaryoları AI — metriklerden hemen sonra */}
+      <AiInsightCard title="Risk Senaryolari" icon={ShieldAlert} loading={rsLoading} error={rsError}>
+        {riskSenaryo && (
+          <div className="space-y-2.5">
+            <p className="text-[11px] text-foreground leading-relaxed">{riskSenaryo.currentRiskSummary}</p>
+
+            {riskSenaryo.scenarios.map((sc, i) => {
+              const probColor = sc.probability === "HIGH" ? "border-loss/20 bg-loss/5" : sc.probability === "MEDIUM" ? "border-amber-400/20 bg-amber-400/5" : "border-gain/20 bg-gain/5";
+              const probText = sc.probability === "HIGH" ? "Yuksek" : sc.probability === "MEDIUM" ? "Orta" : "Dusuk";
+              const probBadge = sc.probability === "HIGH" ? "bg-loss/10 text-loss" : sc.probability === "MEDIUM" ? "bg-amber-400/10 text-amber-400" : "bg-gain/10 text-gain";
+              return (
+                <div key={i} className={cn("rounded-lg border p-2.5", probColor)}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[11px] font-medium text-foreground">{sc.title}</span>
+                    <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-medium ml-auto", probBadge)}>{probText}</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">{sc.impact}</p>
+                  <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/10 text-[10px]">
+                    <span className="text-loss font-medium">{sc.estimatedLoss}</span>
+                    <span className="text-muted-foreground/60">{sc.hedgeSuggestion}</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="rounded-lg border border-loss/20 bg-loss/5 p-2.5">
+              <p className="text-[9px] text-loss font-medium uppercase mb-0.5">En Kotu Senaryo</p>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">{riskSenaryo.worstCaseNarrative}</p>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground/60 italic">{riskSenaryo.riskAppetiteAdvice}</p>
+          </div>
+        )}
+      </AiInsightCard>
+
       {/* Stress Tests */}
       {rm.stressTests && rm.stressTests.length > 0 && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -119,6 +159,7 @@ export function RiskTab({ d, timeLabel }: RiskTabProps) {
           )}
         </div>
       )}
+
     </div>
   );
 }

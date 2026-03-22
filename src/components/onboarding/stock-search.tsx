@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StockChip } from "./stock-chip";
-import { PremiumUpsellModal } from "./premium-upsell-modal";
 import { useStockSearch } from "@/hooks/use-stock-search";
 import { Search, ArrowRight, TrendingUp } from "lucide-react";
 import type { StockSearchResult } from "@/types";
@@ -38,7 +37,6 @@ interface SelectedStock {
 export function StockSearch() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<SelectedStock[]>([]);
-  const [showUpsell, setShowUpsell] = useState(false);
   const [saving, setSaving] = useState(false);
   const { results, loading } = useStockSearch(query);
   const router = useRouter();
@@ -55,14 +53,6 @@ export function StockSearch() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stockCode: stock.code }),
       });
-
-      if (res.status === 403) {
-        const data = await res.json();
-        if (data.error === "PREMIUM_REQUIRED") {
-          setShowUpsell(true);
-          return;
-        }
-      }
 
       if (res.ok) {
         setSelected((prev) => [...prev, { code: stock.code, name: stock.name }]);
@@ -183,11 +173,6 @@ export function StockSearch() {
         </Button>
       )}
 
-      {/* Premium upsell modal */}
-      <PremiumUpsellModal
-        open={showUpsell}
-        onClose={() => setShowUpsell(false)}
-      />
     </div>
   );
 }

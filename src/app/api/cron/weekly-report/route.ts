@@ -3,6 +3,8 @@ import { generateWeeklyReport } from "@/lib/cron/weekly-report";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 
+export const maxDuration = 300;
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

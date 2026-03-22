@@ -1,46 +1,29 @@
-import Link from "next/link";
-import { Logo } from "@/components/shared/logo";
+import { Navbar } from "@/components/landing/navbar";
 import { HeroSection } from "@/components/landing/hero-section";
-import { EmailCta } from "@/components/landing/email-cta";
-import { SampleAiCard } from "@/components/landing/sample-ai-card";
-import { SpkDisclaimer } from "@/components/shared/spk-disclaimer";
+import { StockTicker } from "@/components/landing/stock-ticker";
+import { SocialProof } from "@/components/landing/social-proof";
+import { FeaturesBento } from "@/components/landing/features-bento";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { LiveDemo } from "@/components/landing/live-demo";
+import { Testimonials } from "@/components/landing/testimonials";
+import { FinalCta } from "@/components/landing/final-cta";
+import { LandingFooter } from "@/components/landing/landing-footer";
 
 export default function LandingPage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-        <Logo />
-        <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted hover:text-foreground transition-colors"
-          >
-            Giriş Yap
-          </Link>
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center rounded-lg bg-ai-primary hover:bg-ai-primary/90 text-white px-4 py-2 text-sm font-medium transition-colors"
-          >
-            Kayıt Ol
-          </Link>
-        </div>
-      </header>
-
-      {/* Main */}
-      <main className="flex-1 flex flex-col justify-center py-20">
+    <div className="relative min-h-screen">
+      <Navbar />
+      <main>
         <HeroSection />
-        <EmailCta />
-        <SampleAiCard />
+        <StockTicker />
+        <SocialProof />
+        <FeaturesBento />
+        <HowItWorks />
+        <LiveDemo />
+        <Testimonials />
+        <FinalCta />
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border/50 px-6 py-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} Bistbase. Tüm hakları saklıdır.
-        </p>
-        <SpkDisclaimer />
-      </footer>
+      <LandingFooter />
     </div>
   );
 }

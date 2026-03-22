@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { SectionHeader, FactorBar } from "@/components/stock-detail/shared";
 import { VerdictCard } from "@/components/stock-detail/VerdictCard";
+import { AiInsightCard } from "@/components/stock-detail/AiInsightCard";
 import { PERIOD_LABELS } from "@/components/stock-detail/types";
 import type { StockDetail, Summary, Period } from "@/components/stock-detail/types";
+import type { AkilliOzetOutput, GirisCikisOutput } from "@/lib/ai/types";
 
 interface SummaryTabProps {
   d: StockDetail;
@@ -24,9 +26,15 @@ interface SummaryTabProps {
   stockCode: string;
   timeLabel: "realtime" | "daily" | "weekly" | "monthly";
   onTabChange: (tab: string) => void;
+  akilliOzet: AkilliOzetOutput | null;
+  aoLoading: boolean;
+  aoError: boolean;
+  girisCikis: GirisCikisOutput | null;
+  gcLoading: boolean;
+  gcError: boolean;
 }
 
-export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCode, timeLabel, onTabChange }: SummaryTabProps) {
+export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCode, timeLabel, onTabChange, akilliOzet, aoLoading, aoError, girisCikis, gcLoading, gcError }: SummaryTabProps) {
   const [showHistory, setShowHistory] = useState(false);
 
   const isToday = period === "today";
@@ -94,103 +102,64 @@ export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCod
   const verdictSentiment = isToday ? (cs?.sentimentScore === "POSITIVE" ? 50 : cs?.sentimentScore === "NEGATIVE" ? -50 : 0) : (ai?.sentimentValue ?? null);
   const verdictReasonText = isToday ? cs?.verdictReason : (pd?.aiAnalysis as { verdictReason?: string } | null)?.verdictReason ?? cs?.verdictReason;
 
+  // Category colors for bullets
+  const catColor: Record<string, string> = {
+    technical: "text-ai-primary",
+    fundamental: "text-amber-400",
+    macro: "text-blue-400",
+    risk: "text-loss",
+  };
+
   return (
-    <div className="space-y-4">
-      {/* Verdict */}
+    <div className="space-y-3">
+      {/* 1. Verdict — ana aksiyon, ilk bakışta durum */}
       <VerdictCard
         d={d}
         sentimentValue={verdictSentiment}
         verdictReason={verdictReasonText}
       />
 
-      {/* AI Analysis */}
-      <div>
-        <SectionHeader icon={Sparkles} label={`${tfLabel} AI Analizi`} timeLabel={timeLabel} />
+      {/* 2. Akıllı Özet — AI brifing */}
+      <AiInsightCard title="Akilli Ozet" icon={Sparkles} loading={aoLoading} error={aoError}>
+        {akilliOzet && (
+          <div className="space-y-2.5">
+            <p className="text-sm font-semibold text-foreground leading-snug">{akilliOzet.tldr}</p>
 
-        {/* Loading */}
-        {!isToday && pdLoading && (
-          <div className="rounded-xl border border-ai-primary/20 bg-ai-primary/5 p-6">
-            <div className="flex items-center gap-2 text-ai-primary">
-              <Sparkles className="h-4 w-4 animate-pulse" />
-              <span className="text-sm font-medium">{tfLabel} analizi yükleniyor...</span>
-            </div>
-            <div className="mt-3 space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /><Skeleton className="h-4 w-3/5" /></div>
-          </div>
-        )}
-
-        {/* Main AI card */}
-        {hasAI && (
-          <div className="rounded-xl border border-ai-primary/20 bg-ai-primary/5 p-4">
-            {/* AI source badge */}
-            <div className="flex items-center gap-2 mb-2">
-              {isFallback ? (
-                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/30">Otomatik Analiz</span>
-              ) : (
-                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-ai-primary/10 text-ai-primary border border-ai-primary/20">AI Destekli</span>
-              )}
+            <div className="space-y-1">
+              {akilliOzet.bullets.map((b, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="text-xs shrink-0 mt-0.5">{b.icon}</span>
+                  <p className={cn("text-[11px] leading-relaxed", catColor[b.category] ?? "text-muted-foreground")}>{b.text}</p>
+                </div>
+              ))}
             </div>
 
-            <p className="text-[12px] leading-relaxed text-foreground mb-3">{text}</p>
-            {(bull || bear) && (
-              <div className="grid grid-cols-2 gap-3">
-                {bull && (
-                  <div className="rounded-lg border border-gain/15 bg-gain/5 p-3">
-                    <div className="flex items-center gap-1.5 mb-1.5"><TrendingUp className="h-3 w-3 text-gain" /><span className="text-[10px] font-medium text-gain uppercase">Boğa</span></div>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">{bull}</p>
-                  </div>
-                )}
-                {bear && (
-                  <div className="rounded-lg border border-loss/15 bg-loss/5 p-3">
-                    <div className="flex items-center gap-1.5 mb-1.5"><TrendingDown className="h-3 w-3 text-loss" /><span className="text-[10px] font-medium text-loss uppercase">Ayı</span></div>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">{bear}</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {ai && ai.sentimentValue != null && (
-              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/20 text-[10px] text-muted-foreground/60">
-                <span>Duyarlılık: <span className={cn("font-medium", ai.sentimentValue > 0 ? "text-gain" : ai.sentimentValue < 0 ? "text-loss" : "text-muted-foreground")}>{ai.sentimentValue > 0 ? "+" : ""}{ai.sentimentValue}</span></span>
-                <span>Güven: <span className="font-medium text-foreground">{ai.confidence === "HIGH" ? "Yüksek" : ai.confidence === "LOW" ? "Düşük" : "Orta"}</span></span>
-              </div>
-            )}
-          </div>
-        )}
+            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/15">
+              {[
+                { label: "Kisa Vade", text: akilliOzet.timeHorizon.shortTerm },
+                { label: "Orta Vade", text: akilliOzet.timeHorizon.mediumTerm },
+                { label: "Uzun Vade", text: akilliOzet.timeHorizon.longTerm },
+              ].map((h) => (
+                <div key={h.label}>
+                  <p className="text-[9px] text-muted-foreground/50 uppercase mb-0.5">{h.label}</p>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">{h.text}</p>
+                </div>
+              ))}
+            </div>
 
-        {/* No AI available */}
-        {!isToday && !pdLoading && !hasAI && (
-          <div className="rounded-xl border border-border/40 bg-card/30 p-6 text-center">
-            <p className="text-sm text-muted-foreground">AI analizi üretilemedi.</p>
-          </div>
-        )}
-
-        {/* Past analyses */}
-        {history.length > 0 && (
-          <div className="mt-4">
-            <button onClick={() => setShowHistory(!showHistory)} className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-border/30 bg-card/30 text-[11px] text-muted-foreground hover:text-foreground hover:bg-card/50 transition-all">
-              <Sparkles className="h-3 w-3" />
-              {showHistory ? "Geçmişi gizle" : `Geçmiş analizleri göster (${history.length})`}
-            </button>
-            {showHistory && (
-              <div className="space-y-2 mt-2">
-                {history.map((s: any) => (
-                  <div key={s.id} className="rounded-lg border border-border/30 bg-card/20 p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-muted-foreground/50">{new Date(s.date).toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" })}</span>
-                      <div className="flex items-center gap-1.5">
-                        {s.closePrice != null && <span className="text-[10px] text-muted-foreground tabular-nums">₺{s.closePrice.toFixed(2)}</span>}
-                        {s.compositeScore != null && <span className={cn("text-[9px] font-bold tabular-nums px-1 py-0.5 rounded", s.compositeScore >= 58 ? "bg-gain/10 text-gain" : s.compositeScore >= 42 ? "bg-amber-400/10 text-amber-400" : "bg-loss/10 text-loss")}>{s.compositeScore}</span>}
-                      </div>
-                    </div>
-                    {s.aiSummaryText && <p className="text-[11px] leading-relaxed text-muted-foreground">{s.aiSummaryText}</p>}
-                  </div>
+            {akilliOzet.watchlist.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/15">
+                <span className="text-[9px] text-muted-foreground/50 uppercase mr-1 self-center">Izle:</span>
+                {akilliOzet.watchlist.map((w, i) => (
+                  <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20">{w}</span>
                 ))}
               </div>
             )}
           </div>
         )}
-      </div>
+      </AiInsightCard>
 
-      {/* Factor Breakdown */}
+      {/* 3. Faktör Analizi — hızlı tarama */}
       {!d?.score && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4 text-center">
           <p className="text-xs text-muted-foreground">Skor verisi şu anda alınamıyor. Piyasa kapalı olabilir veya yeterli geçmiş veri yok.</p>
@@ -214,18 +183,82 @@ export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCod
       {/* Score drift warning (today only) */}
       {period === "today" && scoreDiff >= 10 && (
         <div className="bg-amber-400/10 border border-amber-400/20 rounded-xl p-3">
-          <p className="text-[11px] text-amber-400 font-medium">Skor gün içinde değişti</p>
+          <p className="text-[11px] text-amber-400 font-medium">Skor gun icinde degisti</p>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Anlık skor ({liveScoreVal}) ile günlük AI analizi ({dailyScoreVal}) arasında {Math.round(scoreDiff)} puan fark var. Piyasa gün içinde hareket etmiş olabilir.
+            Anlik skor ({liveScoreVal}) ile gunluk AI analizi ({dailyScoreVal}) arasinda {Math.round(scoreDiff)} puan fark var.
           </p>
         </div>
       )}
 
-      {/* Top 3 Signals with backtest badges */}
+      {/* 4. Giriş-Çıkış Noktaları — compact layout */}
+      <AiInsightCard title="Giris-Cikis Noktalari" icon={Target} loading={gcLoading} error={gcError}>
+        {girisCikis && (
+          <div className="space-y-2.5">
+            {/* Setup header */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium text-foreground">{girisCikis.tradeSetupType}</span>
+              <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded",
+                girisCikis.setupQuality === "A" ? "bg-amber-300/20 text-amber-300" :
+                girisCikis.setupQuality === "B" ? "bg-slate-300/20 text-slate-300" :
+                "bg-orange-700/20 text-orange-400"
+              )}>
+                {girisCikis.setupQuality === "A" ? "A" : girisCikis.setupQuality === "B" ? "B" : "C"}
+              </span>
+            </div>
+
+            {/* Entry + Exit grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Entry zones */}
+              <div className="space-y-1.5">
+                {girisCikis.entryZones.map((ez, i) => (
+                  <div key={i} className="rounded-lg border border-gain/15 bg-gain/5 p-2.5">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] font-medium text-gain flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Giris {i + 1}</span>
+                      <span className="text-[11px] font-bold text-gain tabular-nums">{ez.priceRange}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{ez.reasoning}</p>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {ez.confluence.map((c, j) => (
+                        <span key={j} className="text-[9px] px-1 py-0.5 rounded bg-gain/10 text-gain/80">{c}</span>
+                      ))}
+                      {ez.riskReward && <span className="text-[9px] text-muted-foreground/40 ml-auto">{ez.riskReward}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Exit targets */}
+              <div className="space-y-1.5">
+                {girisCikis.exitTargets.map((et, i) => (
+                  <div key={i} className="rounded-lg border border-loss/15 bg-loss/5 p-2.5">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] font-medium text-loss flex items-center gap-1"><TrendingDown className="h-3 w-3" /> {et.type === "partial" ? "Kismi" : "Cikis"} {i + 1}</span>
+                      <span className="text-[11px] font-bold text-loss tabular-nums">{et.price}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{et.reasoning}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Stop Loss — compact */}
+            <div className="flex items-center gap-3 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2">
+              <Shield className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] text-amber-400 font-medium">Stop-Loss: </span>
+                <span className="text-[11px] font-bold text-amber-400 tabular-nums">{girisCikis.stopLoss.price}</span>
+                <span className="text-[10px] text-muted-foreground/60 ml-1.5">{girisCikis.stopLoss.atrBased}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </AiInsightCard>
+
+      {/* 5. En Güçlü Sinyaller */}
       {topSignals.length > 0 && (
-        <div className="rounded-xl border border-border/40 bg-card/30 p-4">
-          <SectionHeader icon={Zap} label="En Güçlü Sinyaller" subtitle="En yüksek güçlü aktif sinyaller ve kanıtlanmış başarı oranları." timeLabel={timeLabel} />
-          <div className="space-y-3">
+        <div className="rounded-xl border border-border/30 bg-card/30 p-4">
+          <SectionHeader icon={Zap} label="En Guclu Sinyaller" subtitle="En yuksek guclu aktif sinyaller ve kanitlanmis basari oranlari." timeLabel={timeLabel} />
+          <div className="space-y-2.5">
             {topSignals.map((s, i) => {
               const acc = d.signalAccuracy?.[s.type];
               const bt = d.signalBacktest?.performances?.find(p => p.signalType === s.type && p.signalDirection === s.direction);
@@ -238,22 +271,20 @@ export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCod
                     {hasBacktest ? (
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className={cn("text-[10px] font-medium", bt.horizon1D.winRate >= 60 ? "text-gain" : bt.horizon1D.winRate >= 45 ? "text-amber-400" : "text-loss")}>
-                          %{bt.horizon1D.winRate} başarı ({bt.horizon1D.sampleSize} sinyal)
+                          %{bt.horizon1D.winRate} basari ({bt.horizon1D.sampleSize} sinyal)
                         </span>
                         {bt.horizon1D.profitFactor >= 1 && (
-                          <span className="text-[9px] text-muted-foreground/50">
-                            KF: {bt.horizon1D.profitFactor}x
-                          </span>
+                          <span className="text-[9px] text-muted-foreground/50">KF: {bt.horizon1D.profitFactor}x</span>
                         )}
-                        <span className={cn("text-[8px] px-1 py-0.5 rounded-full font-medium",
+                        <span className={cn("text-[9px] px-1 py-0.5 rounded-full font-medium",
                           bt.confidence === "HIGH" ? "bg-gain/10 text-gain" : bt.confidence === "LOW" ? "bg-loss/10 text-loss" : "bg-amber-400/10 text-amber-400"
                         )}>
-                          {bt.confidence === "HIGH" ? "Kanıtlanmış" : bt.confidence === "MEDIUM" ? "Orta Güven" : "Düşük Güven"}
+                          {bt.confidence === "HIGH" ? "Kanitlanmis" : bt.confidence === "MEDIUM" ? "Orta" : "Dusuk"}
                         </span>
                       </div>
                     ) : acc && acc.count >= 3 ? (
                       <p className={cn("text-[10px] mt-0.5 font-medium", acc.rate >= 70 ? "text-gain" : acc.rate >= 50 ? "text-amber-400" : "text-loss")}>
-                        Geçmiş doğruluk: %{acc.rate} ({acc.count} sinyal)
+                        Gecmis dogruluk: %{acc.rate} ({acc.count} sinyal)
                       </p>
                     ) : null}
                   </div>
@@ -262,12 +293,35 @@ export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCod
             })}
           </div>
           {d.signals.length > 3 && (
-            <button
-              onClick={() => onTabChange("technical")}
-              className="mt-3 w-full text-center text-[11px] text-ai-primary hover:underline"
-            >
-              Tüm sinyalleri ve performansları gör ({d.signals.length}) &rarr;
+            <button onClick={() => onTabChange("technical")} className="mt-3 w-full text-center text-[11px] text-ai-primary hover:underline">
+              Tum sinyalleri gor ({d.signals.length}) &rarr;
             </button>
+          )}
+        </div>
+      )}
+
+      {/* 6. Geçmiş Analizler */}
+      {history.length > 0 && (
+        <div>
+          <button onClick={() => setShowHistory(!showHistory)} className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-border/30 bg-card/20 text-[11px] text-muted-foreground hover:text-foreground hover:bg-card/40 transition-all">
+            <Sparkles className="h-3 w-3" />
+            {showHistory ? "Gecmisi gizle" : `Gecmis analizler (${history.length})`}
+          </button>
+          {showHistory && (
+            <div className="space-y-1.5 mt-2">
+              {history.map((s: any) => (
+                <div key={s.id} className="rounded-lg border border-border/20 bg-card/20 p-2.5">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] text-muted-foreground/50">{new Date(s.date).toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" })}</span>
+                    <div className="flex items-center gap-1.5">
+                      {s.closePrice != null && <span className="text-[10px] text-muted-foreground tabular-nums">₺{s.closePrice.toFixed(2)}</span>}
+                      {s.compositeScore != null && <span className={cn("text-[9px] font-bold tabular-nums px-1 py-0.5 rounded", s.compositeScore >= 58 ? "bg-gain/10 text-gain" : s.compositeScore >= 42 ? "bg-amber-400/10 text-amber-400" : "bg-loss/10 text-loss")}>{s.compositeScore}</span>}
+                    </div>
+                  </div>
+                  {s.aiSummaryText && <p className="text-[11px] leading-relaxed text-muted-foreground">{s.aiSummaryText}</p>}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

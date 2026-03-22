@@ -5,93 +5,80 @@ import { cn } from "@/lib/utils";
 import { Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QUERY_KEYS } from "@/lib/constants";
-
-interface DrawdownData {
-  currentDrawdown: number;
-  maxDrawdown: number;
-  maxDrawdownPeak: string;
-  maxDrawdownTrough: string;
-  recoveryDate: string | null;
-  peakToTrough: number;
-  troughToRecovery: number | null;
-  drawdownSeries: { date: string; drawdown: number }[];
-}
-
-function DrawdownChart({ series }: { series: DrawdownData["drawdownSeries"] }) {
-  if (series.length < 2) return null;
-
-  const width = 300;
-  const height = 60;
-  const maxDD = Math.min(...series.map(s => s.drawdown), -1);
-  const minDD = 0;
-
-  const points = series.map((s, i) => {
-    const x = (i / (series.length - 1)) * width;
-    const y = height - ((s.drawdown - maxDD) / (minDD - maxDD)) * height;
-    return `${x},${y}`;
-  });
-
-  const areaPoints = [`0,${height}`, ...points, `${width},${height}`].join(" ");
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16" preserveAspectRatio="none">
-      {/* Zero line */}
-      <line x1="0" y1={height} x2={width} y2={height} stroke="currentColor" strokeWidth="0.5" className="text-border/30" />
-      {/* Drawdown area */}
-      <polygon points={areaPoints} className="fill-loss/15" />
-      {/* Drawdown line */}
-      <polyline points={points.join(" ")} fill="none" stroke="currentColor" strokeWidth="1.5" className="text-loss/60" />
-    </svg>
-  );
-}
+import { LightweightChart } from "./charts/lightweight-chart-wrapper";
 
 export function PortfolioDrawdown() {
-  const { data, isLoading } = useQuery<{ drawdown: DrawdownData | null }>({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, isLoading } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading) return <div className="rounded-xl border border-border/40 bg-card/30 p-4"><Skeleton className="h-24 w-full" /></div>;
+  if (isLoading) {
+    return (
+      <div className="bento-card">
+        <div className="bento-card-header"><Skeleton className="h-4 w-32" /></div>
+        <div className="bento-card-body"><Skeleton className="h-[200px] w-full" /></div>
+      </div>
+    );
+  }
 
   const dd = data?.drawdown;
   if (!dd || dd.drawdownSeries.length < 5) return null;
 
+  const chartData = dd.drawdownSeries.map((p: { date: string; drawdown: number }) => ({
+    time: p.date,
+    value: p.drawdown,
+  }));
+
   return (
-    <div className="rounded-xl border border-border/40 bg-card/30 p-4">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="bento-card animate-slide-up min-w-0">
+      <div className="bento-card-header">
         <Activity className="h-4 w-4 text-loss" />
-        <h3 className="text-[12px] font-semibold text-foreground">Portföy Drawdown</h3>
+        <span className="bento-card-title">Drawdown Analizi</span>
       </div>
+      <div className="bento-card-body">
+        {/* Interactive Chart */}
+        <LightweightChart
+          height={180}
+          series={[{
+            data: chartData,
+            type: "area",
+            color: "#fb7185",
+            lineWidth: 2,
+          }]}
+          showGrid={false}
+        />
 
-      {/* Chart */}
-      <DrawdownChart series={dd.drawdownSeries} />
-
-      {/* Metrics */}
-      <div className="grid grid-cols-3 gap-2 mt-3">
-        <div className="text-center p-2 rounded-lg bg-card/40 border border-border/15">
-          <div className="text-[9px] text-muted-foreground/40">Mevcut</div>
-          <div className={cn("text-[13px] font-bold tabular-nums", dd.currentDrawdown < -5 ? "text-loss" : dd.currentDrawdown < -1 ? "text-amber-400" : "text-gain")}>
-            {dd.currentDrawdown}%
+        {/* Metrics */}
+        <div className="grid grid-cols-3 gap-3 mt-5">
+          <div className="text-center p-2.5 rounded-xl bg-card/30 border border-border/15">
+            <div className="text-[11px] text-muted-foreground/50">Mevcut</div>
+            <div className={cn("text-base font-bold tabular-nums mt-0.5",
+              dd.currentDrawdown < -5 ? "text-loss" : dd.currentDrawdown < -1 ? "text-amber-400" : "text-gain"
+            )}>
+              {dd.currentDrawdown}%
+            </div>
+          </div>
+          <div className="text-center p-2.5 rounded-xl bg-card/30 border border-border/15">
+            <div className="text-[11px] text-muted-foreground/50">Maks Düşüş</div>
+            <div className="text-base font-bold tabular-nums text-loss mt-0.5">{dd.maxDrawdown}%</div>
+          </div>
+          <div className="text-center p-2.5 rounded-xl bg-card/30 border border-border/15">
+            <div className="text-[11px] text-muted-foreground/50">Toparlanma</div>
+            <div className="text-base font-bold tabular-nums text-foreground mt-0.5">
+              {dd.troughToRecovery != null ? `${dd.troughToRecovery} gün` : "Devam"}
+            </div>
           </div>
         </div>
-        <div className="text-center p-2 rounded-lg bg-card/40 border border-border/15">
-          <div className="text-[9px] text-muted-foreground/40">Maks Düşüş</div>
-          <div className="text-[13px] font-bold tabular-nums text-loss">{dd.maxDrawdown}%</div>
-        </div>
-        <div className="text-center p-2 rounded-lg bg-card/40 border border-border/15">
-          <div className="text-[9px] text-muted-foreground/40">Toparlanma</div>
-          <div className="text-[13px] font-bold tabular-nums text-foreground">
-            {dd.troughToRecovery != null ? `${dd.troughToRecovery} gün` : "Devam"}
-          </div>
-        </div>
-      </div>
 
-      {/* Detail */}
-      <p className="text-[9px] text-muted-foreground/40 mt-2 pt-2 border-t border-border/10">
-        En derin düşüş: {dd.maxDrawdownPeak} → {dd.maxDrawdownTrough} ({dd.peakToTrough} gün)
-        {dd.recoveryDate ? ` · ${dd.recoveryDate} tarihinde toparlandı` : " · Henüz toparlanmadı"}
-      </p>
+        {/* Detail */}
+        <p className="text-xs text-muted-foreground/50 mt-3 pt-3 border-t border-border/15">
+          En derin düşüş: {dd.maxDrawdownPeak} → {dd.maxDrawdownTrough} ({dd.peakToTrough} gün)
+          {dd.recoveryDate ? ` · ${dd.recoveryDate} tarihinde toparlandı` : " · Henüz toparlanmadı"}
+        </p>
+      </div>
     </div>
   );
 }

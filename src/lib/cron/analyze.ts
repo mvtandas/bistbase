@@ -13,6 +13,10 @@ import { detectCandlestickPatterns } from "@/lib/stock/candlesticks";
 import { detectChartPatterns } from "@/lib/stock/chart-patterns";
 import { calculateExtraIndicators } from "@/lib/stock/extra-indicators";
 import { detectSignalChains } from "@/lib/stock/signal-chains";
+import { calculateVerdict, type VerdictInput } from "@/lib/stock/verdict";
+import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
+import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
+import { calculateBacktest } from "@/lib/stock/backtest";
 
 function getToday(): Date {
   const now = new Date();
@@ -198,9 +202,66 @@ export async function runDailyAnalysis(): Promise<{
           ? calculateCompositeScore(technicals, price, analysis.sentimentValue, fundScore, macroData, sectorContext?.sectorCode)
           : preScore;
 
-        // ── STEP 8: Persist everything ──
+        // ── STEP 8.5: Calculate verdict for persistence ──
+        let verdictAction: string | null = null;
+        let verdictScore: number | null = null;
+        let verdictConfidence: number | null = null;
+        try {
+          const signalCombination = analyzeSignalCombinations(signals);
+          const signalAccuracy = accuracyMap;
+          const [multiTimeframe, signalBacktest] = await Promise.all([
+            bars.length > 0 && technicals
+              ? analyzeMultiTimeframe(stockCode, bars, { rsi14: technicals.rsi14, maAlignment: technicals.maAlignment })
+              : Promise.resolve(null),
+            calculateBacktest(stockCode),
+          ]);
+          // Convert Map to Record for verdict input
+          const signalAccuracyRecord: Record<string, { rate: number; count: number }> = {};
+          for (const [key, val] of signalAccuracy) {
+            signalAccuracyRecord[key] = { rate: val.accuracyRate, count: val.totalCount };
+          }
+          const verdict = calculateVerdict({
+            price,
+            technicals: technicals as Record<string, unknown> | null,
+            extraIndicators: extraIndicators as unknown as VerdictInput["extraIndicators"],
+            score: finalScore,
+            fundamentalScore: fundScore,
+            signals,
+            signalCombination: signalCombination ? {
+              totalBullish: signalCombination.totalBullish,
+              totalBearish: signalCombination.totalBearish,
+              confluenceType: signalCombination.confluenceType,
+              conflicting: signalCombination.conflicting,
+            } : null,
+            signalAccuracy: signalAccuracyRecord,
+            multiTimeframe: multiTimeframe ? {
+              weekly: { trend: multiTimeframe.weekly.trend },
+              daily: { trend: multiTimeframe.daily?.trend ?? null },
+              alignment: multiTimeframe.alignment,
+            } : null,
+            macroData,
+            riskMetrics,
+            sentimentValue: analysis.sentimentValue,
+            signalBacktest: signalBacktest?.performances?.length ? {
+              performances: signalBacktest.performances.map(p => ({
+                signalType: p.signalType,
+                horizon1D: p.horizon1D,
+                bestHorizon: p.bestHorizon,
+                confidenceScore: p.confidenceScore,
+                streaks: p.streaks,
+              })),
+            } : null,
+          });
+          verdictAction = verdict.action;
+          verdictScore = verdict.score;
+          verdictConfidence = verdict.confidence;
+        } catch (e) {
+          console.error(`Verdict calculation failed for ${stockCode}:`, e);
+        }
 
-        // 8a. TechnicalSnapshot (persistent, not ephemeral!)
+        // ── STEP 9: Persist everything ──
+
+        // 9a. TechnicalSnapshot (persistent, not ephemeral!)
         if (technicals) {
           await prisma.technicalSnapshot.upsert({
             where: { stockCode_date: { stockCode, date: today } },
@@ -326,6 +387,9 @@ export async function runDailyAnalysis(): Promise<{
             bist100Change: sectorContext?.bist100Change ?? null,
             analyzedAt: new Date(),
             status: "COMPLETED",
+            verdictAction,
+            verdictScore,
+            verdictConfidence,
           },
         });
 
@@ -521,6 +585,44 @@ export async function runBackfill(daysBack: number = 30, skipAI: boolean = false
             });
           }
 
+          // Verdict hesapla (gerçek 3-pillar engine)
+          let bfVerdictAction: string | null = null;
+          let bfVerdictScore: number | null = null;
+          let bfVerdictConfidence: number | null = null;
+          try {
+            const extraIndicators = calculateExtraIndicators(windowBars, technicals?.bbUpper, technicals?.bbLower);
+            const signalCombination = analyzeSignalCombinations(signals);
+            const signalAccuracyRecord: Record<string, { rate: number; count: number }> = {};
+            for (const [key, val] of accuracyMap) {
+              signalAccuracyRecord[key] = { rate: val.accuracyRate, count: val.totalCount };
+            }
+            const verdict = calculateVerdict({
+              price,
+              technicals: technicals as unknown as Record<string, unknown> | null,
+              extraIndicators: extraIndicators as unknown as VerdictInput["extraIndicators"],
+              score: finalScore,
+              fundamentalScore: fundScore,
+              signals,
+              signalCombination: signalCombination ? {
+                totalBullish: signalCombination.totalBullish,
+                totalBearish: signalCombination.totalBearish,
+                confluenceType: signalCombination.confluenceType,
+                conflicting: signalCombination.conflicting,
+              } : null,
+              signalAccuracy: signalAccuracyRecord,
+              multiTimeframe: null, // Backfill'de MTF hesaplamıyoruz (performans)
+              macroData,
+              riskMetrics,
+              sentimentValue: sentiment,
+              signalBacktest: null,
+            });
+            bfVerdictAction = verdict.action;
+            bfVerdictScore = verdict.score;
+            bfVerdictConfidence = verdict.confidence;
+          } catch {
+            // Verdict hesaplanamadıysa null kalır
+          }
+
           // DailySummary
           await prisma.dailySummary.upsert({
             where: { stockCode_date_timeframe: { stockCode, date: dateUTC, timeframe: "daily" } },
@@ -533,11 +635,17 @@ export async function runBackfill(daysBack: number = 30, skipAI: boolean = false
               compositeScore: finalScore?.composite ?? null,
               sectorCode: sectorContext?.sectorCode ?? null, sectorChange: sectorContext?.sectorChange ?? null,
               relativeStrength: sectorContext?.relativeStrength ?? null, bist100Change: sectorContext?.bist100Change ?? null,
+              verdictAction: bfVerdictAction,
+              verdictScore: bfVerdictScore,
+              verdictConfidence: bfVerdictConfidence,
               status: "COMPLETED",
             },
             update: {
               closePrice: price, changePercent,
               compositeScore: finalScore?.composite ?? null,
+              verdictAction: bfVerdictAction,
+              verdictScore: bfVerdictScore,
+              verdictConfidence: bfVerdictConfidence,
               status: "COMPLETED",
             },
           });

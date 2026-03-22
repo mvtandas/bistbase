@@ -6,17 +6,22 @@ import { MetricCard } from "@/components/ui/metric-card";
 import * as I from "@/lib/stock/interpretations";
 import { Wallet, Calendar, Globe, Users } from "lucide-react";
 import { SectionHeader, fmt, formatCap } from "@/components/stock-detail/shared";
+import { AiInsightCard } from "@/components/stock-detail/AiInsightCard";
 import type { StockDetail } from "@/components/stock-detail/types";
+import type { SektorAnalizOutput } from "@/lib/ai/types";
 
 interface FundamentalTabProps {
   d: StockDetail;
   stockCode: string;
   timeLabel: "realtime" | "daily" | "weekly" | "monthly";
+  sektorAnaliz: SektorAnalizOutput | null;
+  saLoading: boolean;
+  saError: boolean;
 }
 
-export function FundamentalTab({ d, stockCode, timeLabel }: FundamentalTabProps) {
+export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoading, saError }: FundamentalTabProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
 
       {/* Fundamentals Panel */}
       {d.financials && (
@@ -164,6 +169,23 @@ export function FundamentalTab({ d, stockCode, timeLabel }: FundamentalTabProps)
         </div>
       )}
 
+      {/* Sektör Karşılaştırma AI — sektör verisinden hemen sonra */}
+      <AiInsightCard title="Sektor Karsilastirma" icon={Users} loading={saLoading} error={saError}>
+        {sektorAnaliz && (
+          <div className="space-y-2">
+            <p className="text-[11px] text-foreground leading-relaxed">{sektorAnaliz.positionSummary}</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{sektorAnaliz.competitiveAdvantage}</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{sektorAnaliz.valuationComparison}</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{sektorAnaliz.sectorOutlook}</p>
+            {sektorAnaliz.betterAlternative && (
+              <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-2.5">
+                <p className="text-[10px] text-amber-400 font-medium">Alternatif: {sektorAnaliz.betterAlternative}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </AiInsightCard>
+
       {/* Seasonality */}
       {d.seasonality && d.seasonality.monthlyAvgReturn != null && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -217,6 +239,7 @@ export function FundamentalTab({ d, stockCode, timeLabel }: FundamentalTabProps)
           )}
         </div>
       )}
+
     </div>
   );
 }

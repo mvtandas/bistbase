@@ -87,8 +87,8 @@ export function calculateRiskMetrics(
   const annualVol = dailyVol * Math.sqrt(252);
 
   // Risk-free rate: TCMB politika faizi (env ile ayarlanabilir)
-  // Varsayılan %50 ama env ile override edilebilir
-  const riskFreeAnnual = parseFloat(process.env.RISK_FREE_RATE ?? "0.50");
+  // Varsayılan %25 — Türkiye piyasası için yaklaşık politika faizi
+  const riskFreeAnnual = parseFloat(process.env.RISK_FREE_RATE ?? "0.25");
   const riskFreeDaily = riskFreeAnnual / 252;
 
   // Sharpe Ratio
@@ -96,12 +96,13 @@ export function calculateRiskMetrics(
     ? ((meanReturn - riskFreeDaily) / dailyVol) * Math.sqrt(252)
     : null;
 
-  // Sortino Ratio — sadece aşağı yön volatilitesini kullanır (Sharpe'dan daha adil)
-  const downsideReturns = returns.filter(r => r < riskFreeDaily);
-  const downsideVariance = downsideReturns.length > 0
-    ? downsideReturns.reduce((sum, r) => sum + (r - riskFreeDaily) ** 2, 0) / downsideReturns.length
-    : 0;
-  const downsideVol = Math.sqrt(downsideVariance);
+  // Sortino Ratio — sadece aşağı yön volatilitesini kullanır
+  // Downside deviation: sqrt(sum(min(r - meanReturn, 0)²) / N)
+  const downsideSquaredSum = returns.reduce((sum, r) => {
+    const diff = r - meanReturn;
+    return sum + (diff < 0 ? diff ** 2 : 0);
+  }, 0);
+  const downsideVol = Math.sqrt(downsideSquaredSum / returns.length);
   const sortinoRatio = downsideVol > 0
     ? ((meanReturn - riskFreeDaily) / downsideVol) * Math.sqrt(252)
     : null;
@@ -128,16 +129,17 @@ export function calculateRiskMetrics(
 
   // VaR (Historical Simulation — 95th percentile)
   const sortedReturns = [...returns].sort((a, b) => a - b);
-  const idx95 = Math.floor(sortedReturns.length * 0.05);
+  const idx95 = Math.max(0, Math.ceil(sortedReturns.length * 0.05) - 1);
   const var95Daily = sortedReturns[idx95] ? Math.abs(sortedReturns[idx95]) * 100 : null;
   const var95Weekly = var95Daily ? var95Daily * Math.sqrt(5) : null;
 
   // Risk seviyesi
   let riskLevel: RiskMetrics["riskLevel"] = null;
   let riskLevelTr = "";
-  if (annualVol < 0.25) { riskLevel = "LOW"; riskLevelTr = "Düşük Risk"; }
-  else if (annualVol < 0.40) { riskLevel = "MODERATE"; riskLevelTr = "Orta Risk"; }
-  else if (annualVol < 0.60) { riskLevel = "HIGH"; riskLevelTr = "Yüksek Risk"; }
+  // Türkiye piyasası için ayarlanmış eşikler (BIST'te %30-40 vol normal)
+  if (annualVol < 0.30) { riskLevel = "LOW"; riskLevelTr = "Düşük Risk"; }
+  else if (annualVol < 0.50) { riskLevel = "MODERATE"; riskLevelTr = "Orta Risk"; }
+  else if (annualVol < 0.80) { riskLevel = "HIGH"; riskLevelTr = "Yüksek Risk"; }
   else { riskLevel = "VERY_HIGH"; riskLevelTr = "Çok Yüksek Risk"; }
 
   // Calmar Ratio — yıllık getiri / max drawdown (drawdown quality)

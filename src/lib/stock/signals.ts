@@ -77,48 +77,79 @@ export function detectSignals(
     signals.push(sig("RSI_BEARISH_DIVERGENCE", "BEARISH", 70, `Ayı diverjansı: Fiyat yükselirken RSI (${t.rsi14}) düşmeye başladı. Zayıflama sinyali olabilir.`, "reversal", adx));
   }
 
-  // ── RSI Extremes ──
+  // ── RSI Extremes (trend filtreli) ──
+  // Güçlü trendde (ADX > 25) trend yönündeki RSI extreme → yoksay (false positive)
+  const adxStrong = adx != null && adx > 25;
+  const trendBullish = t.plusDI != null && t.minusDI != null && t.plusDI > t.minusDI;
+  const trendBearish = t.plusDI != null && t.minusDI != null && t.minusDI > t.plusDI;
+
   if (t.rsiSignal === "OVERSOLD") {
-    const hasDivergence = t.rsiBullishDivergence;
-    signals.push(sig(
-      hasDivergence ? "RSI_BULLISH_DIVERGENCE" : "RSI_OVERSOLD", "BULLISH", hasDivergence ? 85 : 55,
-      hasDivergence
-        ? `Boğa diverjansı + aşırı satım: Fiyat düşerken RSI (${t.rsi14}) yükseliyor. Güçlü geri dönüş sinyali!`
-        : `RSI ${t.rsi14} ile aşırı satım bölgesinde. Hisse gereğinden fazla satılmış olabilir, tepki yükselişi gelebilir.`,
-      "reversal", adx,
-    ));
+    // Güçlü düşüş trendinde oversold = trend devam, sinyal üretme
+    const skipSignal = adxStrong && trendBearish;
+    if (!skipSignal) {
+      const hasDivergence = t.rsiBullishDivergence;
+      signals.push(sig(
+        hasDivergence ? "RSI_BULLISH_DIVERGENCE" : "RSI_OVERSOLD", "BULLISH", hasDivergence ? 85 : 55,
+        hasDivergence
+          ? `Boğa diverjansı + aşırı satım: Fiyat düşerken RSI (${t.rsi14}) yükseliyor. Güçlü geri dönüş sinyali!`
+          : `RSI ${t.rsi14} ile aşırı satım bölgesinde. Hisse gereğinden fazla satılmış olabilir, tepki yükselişi gelebilir.`,
+        "reversal", adx,
+      ));
+    }
   }
   if (t.rsiSignal === "OVERBOUGHT") {
-    const hasDivergence = t.rsiBearishDivergence;
-    signals.push(sig(
-      hasDivergence ? "RSI_BEARISH_DIVERGENCE" : "RSI_OVERBOUGHT", "BEARISH", hasDivergence ? 80 : 55,
-      hasDivergence
-        ? `Ayı diverjansı: Fiyat yükselirken RSI (${t.rsi14}) düşmeye başladı. Aşırı alım bölgesinde geri çekilme sinyali.`
-        : `RSI ${t.rsi14} ile aşırı alım bölgesinde. Hisse aşırı değerlenmiş olabilir, düzeltme gelebilir.`,
-      "reversal", adx,
-    ));
+    // Güçlü yükseliş trendinde overbought = trend devam, sinyal üretme
+    const skipSignal = adxStrong && trendBullish;
+    if (!skipSignal) {
+      const hasDivergence = t.rsiBearishDivergence;
+      signals.push(sig(
+        hasDivergence ? "RSI_BEARISH_DIVERGENCE" : "RSI_OVERBOUGHT", "BEARISH", hasDivergence ? 80 : 55,
+        hasDivergence
+          ? `Ayı diverjansı: Fiyat yükselirken RSI (${t.rsi14}) düşmeye başladı. Aşırı alım bölgesinde geri çekilme sinyali.`
+          : `RSI ${t.rsi14} ile aşırı alım bölgesinde. Hisse aşırı değerlenmiş olabilir, düzeltme gelebilir.`,
+        "reversal", adx,
+      ));
+    }
   }
 
-  // ── Bollinger Squeeze ──
+  // ── Bollinger Squeeze (yön belirsiz → düşük strength) ──
   if (t.bbSqueeze) {
-    signals.push(sig("BOLLINGER_SQUEEZE", "BULLISH", 65, `Bollinger sıkışması: Bantlar daraldı (genişlik: ${t.bbWidth?.toFixed(3)}). Sert bir kırılım hareketi yaklaşıyor olabilir.`, "neutral", adx));
+    signals.push(sig("BOLLINGER_SQUEEZE", "NEUTRAL", 40, `Bollinger sıkışması: Bantlar daraldı (genişlik: ${t.bbWidth?.toFixed(3)}). Sert bir kırılım hareketi yaklaşıyor olabilir, yön belirsiz.`, "neutral", adx));
   }
 
-  // ── Bollinger Band Break ──
+  // ── Bollinger Band Break (hacim onaylı) ──
+  const hasVolumeConfirmation = t.volumeRatio != null && t.volumeRatio >= 1.5;
   if (t.bbPercentB != null) {
     if (t.bbPercentB > 1) {
-      signals.push(sig("BB_UPPER_BREAK", "BULLISH", 60, `Fiyat üst Bollinger bandını (₺${t.bbUpper?.toFixed(2)}) aştı. Güçlü momentum göstergesi ama aşırı uzanmış olabilir.`, "trend", adx));
+      const strength = hasVolumeConfirmation ? 65 : 38; // Hacim onayı yoksa çok düşük
+      signals.push(sig("BB_UPPER_BREAK", "BULLISH", strength,
+        `Fiyat üst Bollinger bandını (₺${t.bbUpper?.toFixed(2)}) aştı.${hasVolumeConfirmation ? " Hacim onayı var — güçlü momentum." : " Hacim zayıf, sahte kırılım olabilir."}`,
+        "trend", adx));
     }
     if (t.bbPercentB < 0) {
-      signals.push(sig("BB_LOWER_BREAK", "BEARISH", 60, `Fiyat alt Bollinger bandının (₺${t.bbLower?.toFixed(2)}) altına indi. Aşırı satış baskısı veya geri dönüş fırsatı.`, "reversal", adx));
+      const strength = hasVolumeConfirmation ? 65 : 38;
+      signals.push(sig("BB_LOWER_BREAK", "BEARISH", strength,
+        `Fiyat alt Bollinger bandının (₺${t.bbLower?.toFixed(2)}) altına indi.${hasVolumeConfirmation ? " Hacim onayı var — satış baskısı güçlü." : " Hacim zayıf, geri dönüş olası."}`,
+        "reversal", adx));
     }
   }
 
-  // ── Volume Anomaly ──
+  // ── Volume Anomaly (fiyat yönüyle) ──
   if (t.volumeAnomaly && t.volumeRatio != null) {
-    const priceUp = t.rsi14 != null && t.rsi14 > 50;
-    signals.push(sig("VOLUME_ANOMALY", priceUp ? "BULLISH" : "BEARISH", 70,
-      `Hacim anomalisi: İşlem hacmi 20 gün ortalamasının ${t.volumeRatio.toFixed(1)} katı. ${priceUp ? "Kurumsal alım hareketliliği olabilir." : "Büyük çıkış baskısı olabilir."}`,
+    // Fiyat değişimi ile yön belirle (RSI yerine changePercent daha doğru)
+    const changePercent = t.ma20 != null ? ((currentPrice - t.ma20) / t.ma20) * 100 : null;
+    const priceUp = changePercent != null ? changePercent > 0.5 : (t.rsi14 != null && t.rsi14 > 50);
+    const priceDown = changePercent != null ? changePercent < -0.5 : (t.rsi14 != null && t.rsi14 < 50);
+    const flat = !priceUp && !priceDown;
+
+    const direction: DetectedSignal["direction"] = priceUp ? "BULLISH" : priceDown ? "BEARISH" : "NEUTRAL";
+    const strength = flat ? 45 : 70; // Fiyat değişmeden yüksek hacim → belirsizlik, düşük strength
+
+    signals.push(sig("VOLUME_ANOMALY", direction, strength,
+      `Hacim anomalisi: İşlem hacmi 20 gün ortalamasının ${t.volumeRatio.toFixed(1)} katı. ${
+        priceUp ? "Kurumsal alım hareketliliği olabilir."
+        : priceDown ? "Büyük çıkış baskısı olabilir."
+        : "Fiyat stabil — birikme veya dağıtım belirsiz."}`,
       "volume", adx));
   }
 
@@ -152,12 +183,18 @@ export function detectSignals(
     ));
   }
 
-  // ── Support/Resistance Break ──
+  // ── Support/Resistance Break (hacim onaylı) ──
   if (t.breakoutSignal === "RESISTANCE_BREAK" && t.resistance != null) {
-    signals.push(sig("RESISTANCE_BREAK", "BULLISH", 75, `Direnç kırılımı: Fiyat ₺${currentPrice.toFixed(2)}, direnç seviyesi ₺${t.resistance.toFixed(2)}'yi aştı. Yukarı yönlü hareket güçlenebilir.`, "trend", adx));
+    const strength = hasVolumeConfirmation ? 80 : 50; // Hacim onayı ile güçlü, yoksa zayıf
+    signals.push(sig("RESISTANCE_BREAK", "BULLISH", strength,
+      `Direnç kırılımı: Fiyat ₺${currentPrice.toFixed(2)}, direnç ₺${t.resistance.toFixed(2)}'yi aştı.${hasVolumeConfirmation ? " Hacim onayı var — kırılım güçlü." : " Hacim düşük, sahte kırılım riski."}`,
+      "trend", adx));
   }
   if (t.breakoutSignal === "SUPPORT_BREAK" && t.support != null) {
-    signals.push(sig("SUPPORT_BREAK", "BEARISH", 75, `Destek kırılımı: Fiyat ₺${currentPrice.toFixed(2)}, destek seviyesi ₺${t.support.toFixed(2)}'nin altına indi. Aşağı yönlü baskı artabilir.`, "trend", adx));
+    const strength = hasVolumeConfirmation ? 80 : 50;
+    signals.push(sig("SUPPORT_BREAK", "BEARISH", strength,
+      `Destek kırılımı: Fiyat ₺${currentPrice.toFixed(2)}, destek ₺${t.support.toFixed(2)}'nin altına indi.${hasVolumeConfirmation ? " Hacim onayı var — satış baskısı güçlü." : " Hacim düşük, geri dönüş olası."}`,
+      "trend", adx));
   }
 
   // ── OBV Divergence ──

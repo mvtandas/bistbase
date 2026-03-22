@@ -17,6 +17,12 @@ import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
 import { calculateBacktest } from "@/lib/stock/backtest";
 import { calculateRiskContributions, calculateBenchmarkComparison, calculateAttribution, calculatePortfolioDrawdown } from "@/lib/stock/portfolio-advanced";
+import { calculatePortfolioEquityCurve } from "@/lib/stock/portfolio-equity";
+import { calculateExtendedRiskMetrics } from "@/lib/stock/portfolio-risk-extended";
+import { calculatePortfolioHealthScore } from "@/lib/stock/portfolio-health";
+import { runMonteCarloSimulation } from "@/lib/stock/monte-carlo";
+import { generatePortfolioNarrative } from "@/lib/stock/portfolio-narrative";
+import { calculateStressTest } from "@/lib/stock/stress-test";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -91,7 +97,7 @@ export async function GET(req: NextRequest) {
           const score = safe(() => technicals && price ? calculateCompositeScore(technicals, price, 0, fundScore, macroData, null, tfKey) : null, null);
           const riskMetrics = safe(() => bars.length >= 30 ? calculateRiskMetrics(bars, fundamentalData?.beta ?? null) : null, null);
           const signalCombination = safe(() => analyzeSignalCombinations(signals), null);
-          const multiTimeframe = await analyzeMultiTimeframe(p.stockCode, technicals).catch(() => null);
+          const multiTimeframe = await analyzeMultiTimeframe(p.stockCode, bars, technicals).catch(() => null);
           const backtest = await calculateBacktest(p.stockCode, 180).catch(() => null);
 
           // Calibrate signals
@@ -108,7 +114,7 @@ export async function GET(req: NextRequest) {
 
           if (price && technicals) {
             const verdict = calculateVerdict({
-              price, technicals: technicals as Record<string, unknown>,
+              price, technicals: technicals as unknown as Record<string, unknown>,
               extraIndicators: null, score, fundamentalScore: fundScore,
               signals, signalCombination, signalAccuracy: {},
               multiTimeframe, macroData, riskMetrics,
@@ -175,29 +181,91 @@ export async function GET(req: NextRequest) {
         )
       : null;
 
-    // Drawdown (from portfolio daily values via historical bars)
+    // ═══ Equity Curve (gerçek hesaplama) ═══
+    const equityCurveResult = await calculatePortfolioEquityCurve(stockCodes, weights, 180).catch(() => null);
+
+    // Drawdown — equity curve'den gerçek hesaplama
     let drawdown = null;
+    if (equityCurveResult && equityCurveResult.curve.length > 10) {
+      const dailyValues = equityCurveResult.curve.map(p => ({
+        date: p.date,
+        value: p.portfolioValue,
+      }));
+      drawdown = calculatePortfolioDrawdown(dailyValues);
+    }
+
+    // ═══ Extended Risk Metrics ═══
+    const extendedRiskMetrics = equityCurveResult && equityCurveResult.dailyReturns.length > 20
+      ? calculateExtendedRiskMetrics(
+          equityCurveResult.dailyReturns,
+          drawdown?.maxDrawdown ?? 0,
+        )
+      : null;
+
+    // ═══ Health Score ═══
+    const maxWeight = Math.max(...result.allocation.map(a => a.weight), 0);
+    const positiveVerdictRatio = result.holdings.filter(h =>
+      h.verdictAction === "GUCLU_AL" || h.verdictAction === "AL"
+    ).length / Math.max(1, result.holdings.length);
+
+    const healthScore = calculatePortfolioHealthScore({
+      diversificationScore: portfolioRisk?.diversificationScore ?? 50,
+      riskMetrics: extendedRiskMetrics,
+      alpha: benchmarkComparison.length > 0 ? benchmarkComparison[0].alpha : null,
+      maxWeight,
+      holdingCount: result.holdings.length,
+      positiveVerdictRatio,
+    });
+
+    // ═══ Monte Carlo ═══
+    const monteCarlo = equityCurveResult && equityCurveResult.dailyReturns.length > 20
+      ? runMonteCarloSimulation(equityCurveResult.dailyReturns, 1000, 126)
+      : null;
+
+    // ═══ Stress Test ═══
+    const stressTest = calculateStressTest(
+      holdingResults.map(h => ({
+        stockCode: h.stockCode,
+        weight: result.allocation.find(a => a.stockCode === h.stockCode)?.weight ?? 0,
+        beta: h.beta,
+      }))
+    );
+
+    // ═══ AI Narrative (premium only, non-blocking) ═══
+    let narrative: string | null = null;
     try {
-      // Build portfolio daily value series from individual stock bars
-      const firstStock = stockCodes[0];
-      const refBars = await getHistoricalBars(firstStock, 90).catch(() => []);
-      if (refBars.length > 10) {
-        const dailyValues = refBars.slice(-60).map((bar, idx) => {
-          let value = 0;
-          // Simplified: use equal weight proxy with normalized values
-          value = 100 + (idx > 0 ? result.metrics.dailyChange * idx * 0.1 : 0);
-          return { date: bar.date, value: Math.max(1, value) };
-        });
-        // Better approach: compute actual weighted daily portfolio values
-        // For now use composite score trend as proxy
-        const scoreValue = result.holdings.reduce((sum, h) => sum + (h.compositeScore ?? 50), 0) / Math.max(1, result.holdings.length);
-        const simValues = refBars.slice(-60).map((bar, i) => ({
-          date: bar.date,
-          value: 100 * (1 + (result.metrics.dailyChange / 100) * (i - 30) * 0.05),
-        }));
-        drawdown = calculatePortfolioDrawdown(simValues);
-      }
-    } catch { /* drawdown calc failed */ }
+      narrative = await generatePortfolioNarrative({
+        totalValue: result.metrics.totalValue,
+        totalPnL: result.metrics.totalPnL,
+        totalPnLPercent: result.metrics.totalPnLPercent,
+        dailyChange: result.metrics.dailyChange,
+        verdictAction: result.portfolioVerdict.action,
+        verdictConfidence: result.portfolioVerdict.confidence,
+        compositeScore: result.portfolioCompositeScore,
+        holdingCount: result.holdings.length,
+        alpha: benchmarkComparison.length > 0 ? benchmarkComparison[0].alpha : null,
+        sharpeRatio: extendedRiskMetrics?.sharpeRatio ?? null,
+        diversificationScore: portfolioRisk?.diversificationScore ?? 50,
+        healthGrade: healthScore.grade,
+        strongestHolding: result.strongestHolding,
+        weakestHolding: result.weakestHolding,
+        suggestions: result.suggestions,
+        maxDrawdown: drawdown?.maxDrawdown ?? null,
+      }, userId);
+    } catch { /* narrative generation failed, non-critical */ }
+
+    // ═══ Sparkline Data (her hisse için son 7 gün fiyatları) ═══
+    const sparklineData: Record<string, number[]> = {};
+    await Promise.all(
+      stockCodes.map(async (code) => {
+        try {
+          const bars = await getHistoricalBars(code, 10).catch(() => []);
+          sparklineData[code] = bars.slice(-7).map(b => b.close);
+        } catch {
+          sparklineData[code] = [];
+        }
+      })
+    );
 
     const fullResult = {
       ...result,
@@ -206,6 +274,18 @@ export async function GET(req: NextRequest) {
       correlations: portfolioRisk?.correlations ?? [],
       attribution,
       drawdown,
+      equityCurve: equityCurveResult?.curve ?? [],
+      equityCurveMeta: equityCurveResult ? {
+        totalReturn: equityCurveResult.totalReturn,
+        bist100TotalReturn: equityCurveResult.bist100TotalReturn,
+        alpha: equityCurveResult.alpha,
+      } : null,
+      extendedRiskMetrics,
+      healthScore,
+      monteCarlo,
+      stressTest,
+      narrative,
+      sparklineData,
     };
 
     const responseData = { ...fullResult, timeframe };

@@ -6,19 +6,30 @@ import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { IndicatorGauge, RSI_GAUGE, STOCH_GAUGE, MFI_GAUGE, ADX_GAUGE, BB_GAUGE, CMF_GAUGE } from "@/components/ui/indicator-gauge";
 import * as I from "@/lib/stock/interpretations";
 import {
-  Activity, Zap, BarChart3, TrendingUp, Target,
+  Activity, Zap, BarChart3, TrendingUp, Target, Brain, AlertTriangle,
 } from "lucide-react";
 import { SectionHeader, fmt } from "@/components/stock-detail/shared";
 import { SignalPerformanceCard } from "@/components/stock-detail/SignalPerformanceCard";
+import { AiInsightCard } from "@/components/stock-detail/AiInsightCard";
 import type { StockDetail } from "@/components/stock-detail/types";
+import type { TeknikYorumOutput, SinyalCozumOutput, IslemKurulumuOutput } from "@/lib/ai/types";
 
 interface TechnicalTabProps {
   d: StockDetail;
   stockCode: string;
   timeLabel: "realtime" | "daily" | "weekly" | "monthly";
+  teknikYorum: TeknikYorumOutput | null;
+  tyLoading: boolean;
+  tyError: boolean;
+  sinyalCozum: SinyalCozumOutput | null;
+  scLoading: boolean;
+  scError: boolean;
+  islemKurulumu: IslemKurulumuOutput | null;
+  ikLoading: boolean;
+  ikError: boolean;
 }
 
-export function TechnicalTab({ d, stockCode, timeLabel }: TechnicalTabProps) {
+export function TechnicalTab({ d, stockCode, timeLabel, teknikYorum, tyLoading, tyError, sinyalCozum, scLoading, scError, islemKurulumu, ikLoading, ikError }: TechnicalTabProps) {
   const t = d.technicals as Record<string, number | string | boolean | null> | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawTech = d.technicals as any;
@@ -26,9 +37,9 @@ export function TechnicalTab({ d, stockCode, timeLabel }: TechnicalTabProps) {
   const fibonacci = rawTech?.fibonacci as { swingHigh: number; swingLow: number; levels: { level: number; price: number; label: string }[]; nearestLevel: { level: number; price: number; distance: number } | null; priceZone: string } | null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
 
-      {/* Multi-Timeframe Alignment */}
+      {/* 1. Multi-Timeframe Alignment */}
       {d.multiTimeframe && (
         <div className={cn("rounded-xl border p-4",
           d.multiTimeframe.alignment === "STRONG_ALIGNED" ? "border-gain/20 bg-gain/5" :
@@ -177,6 +188,33 @@ export function TechnicalTab({ d, stockCode, timeLabel }: TechnicalTabProps) {
         </div>
       )}
 
+      {/* Teknik Yorum AI — verilerin yorumu */}
+      <AiInsightCard title="Teknik Yorum" icon={Brain} loading={tyLoading} error={tyError}>
+        {teknikYorum && (
+          <div className="space-y-2">
+            <p className="text-[11px] text-foreground leading-relaxed">{teknikYorum.patternNarrative}</p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">{teknikYorum.historicalContext}</p>
+            {teknikYorum.keyLevel.price > 0 && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-ai-primary/10 text-ai-primary border border-ai-primary/20">
+                  Kritik Seviye: ₺{teknikYorum.keyLevel.price.toFixed(2)} ({teknikYorum.keyLevel.type})
+                </span>
+                <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-medium",
+                  teknikYorum.patternReliability === "HIGH" ? "bg-gain/10 text-gain" : teknikYorum.patternReliability === "LOW" ? "bg-loss/10 text-loss" : "bg-amber-400/10 text-amber-400"
+                )}>
+                  {teknikYorum.patternReliability === "HIGH" ? "Guvenilir" : teknikYorum.patternReliability === "LOW" ? "Dusuk" : "Orta"}
+                </span>
+              </div>
+            )}
+            <details className="text-[11px]">
+              <summary className="text-ai-primary cursor-pointer hover:underline text-[10px]">Confluence detayi</summary>
+              <p className="text-muted-foreground mt-1 leading-relaxed">{teknikYorum.confluenceAnalysis}</p>
+            </details>
+            <p className="text-[11px] font-medium text-foreground italic">{teknikYorum.actionableInsight}</p>
+          </div>
+        )}
+      </AiInsightCard>
+
       {/* Ichimoku Cloud */}
       {ichimoku && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -245,6 +283,46 @@ export function TechnicalTab({ d, stockCode, timeLabel }: TechnicalTabProps) {
         </div>
       )}
 
+      {/* İşlem Kurulumu AI — formasyonlardan sonra */}
+      {(ikLoading || (islemKurulumu && islemKurulumu.setupDetected)) && (
+        <AiInsightCard title="Islem Kurulumu" icon={Zap} loading={ikLoading} error={ikError} borderColor="border-amber-400/15">
+          {islemKurulumu && islemKurulumu.setupDetected && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-foreground">{islemKurulumu.setupName}</span>
+                <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-medium",
+                  islemKurulumu.status === "ACTIVE" ? "bg-gain/10 text-gain" : islemKurulumu.status === "PENDING" ? "bg-amber-400/10 text-amber-400" : "bg-muted text-muted-foreground"
+                )}>{islemKurulumu.status === "ACTIVE" ? "Aktif" : islemKurulumu.status === "PENDING" ? "Beklemede" : "Sona Erdi"}</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">{islemKurulumu.description}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {islemKurulumu.triggerCondition && (
+                  <div className="rounded-lg border border-gain/15 bg-gain/5 p-2">
+                    <p className="text-[9px] text-gain font-medium uppercase mb-0.5">Tetikleyici</p>
+                    <p className="text-[10px] text-muted-foreground">{islemKurulumu.triggerCondition}</p>
+                  </div>
+                )}
+                {islemKurulumu.invalidation && (
+                  <div className="rounded-lg border border-loss/15 bg-loss/5 p-2">
+                    <p className="text-[9px] text-loss font-medium uppercase mb-0.5">Gecersizlik</p>
+                    <p className="text-[10px] text-muted-foreground">{islemKurulumu.invalidation}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground/60">
+                {islemKurulumu.historicalWinRate && <span>{islemKurulumu.historicalWinRate}</span>}
+                {islemKurulumu.timeframe && <span>{islemKurulumu.timeframe}</span>}
+                <div className="flex gap-0.5 ml-auto">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} className={cn("h-1.5 w-2 rounded-full", i < islemKurulumu.confluenceScore ? "bg-amber-400" : "bg-muted/30")} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </AiInsightCard>
+      )}
+
       {/* Extra Indicators */}
       {d.extraIndicators && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -293,6 +371,41 @@ export function TechnicalTab({ d, stockCode, timeLabel }: TechnicalTabProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sinyal Çatışma Çözücü — only when conflict exists */}
+      {(scLoading || (sinyalCozum && sinyalCozum.hasConflict)) && (
+        <AiInsightCard title="Sinyal Çatışma Çözücü" icon={AlertTriangle} loading={scLoading} error={scError} borderColor="border-amber-400/20">
+          {sinyalCozum && sinyalCozum.hasConflict && (
+            <div className="space-y-2">
+              <p className="text-[11px] text-amber-400 font-medium">{sinyalCozum.conflictSummary}</p>
+              <p className="text-[11px] text-foreground leading-relaxed">{sinyalCozum.resolution}</p>
+              {sinyalCozum.dominantSignal.name && (
+                <div className="rounded-lg border border-gain/15 bg-gain/5 p-2">
+                  <p className="text-[9px] text-gain font-medium uppercase mb-0.5">Baskın Sinyal</p>
+                  <p className="text-[10px] text-foreground font-medium">{sinyalCozum.dominantSignal.name} ({sinyalCozum.dominantSignal.direction === "BULLISH" ? "Boğa" : "Ayı"})</p>
+                  <p className="text-[10px] text-muted-foreground">{sinyalCozum.dominantSignal.whyTrust}</p>
+                </div>
+              )}
+              {sinyalCozum.ignoredSignals.length > 0 && (
+                <div className="space-y-1">
+                  {sinyalCozum.ignoredSignals.map((s, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[10px]">
+                      <span className="text-loss/60 shrink-0">✕</span>
+                      <span className="text-muted-foreground"><span className="font-medium text-muted-foreground/80">{s.name}:</span> {s.whyIgnore}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] font-medium text-foreground italic">{sinyalCozum.netConclusion}</p>
+              <span className={cn("text-[9px] px-1.5 py-0.5 rounded font-medium",
+                sinyalCozum.confidenceInResolution === "HIGH" ? "bg-gain/10 text-gain" : sinyalCozum.confidenceInResolution === "LOW" ? "bg-loss/10 text-loss" : "bg-amber-400/10 text-amber-400"
+              )}>
+                Çözüm Güveni: {sinyalCozum.confidenceInResolution === "HIGH" ? "Yüksek" : sinyalCozum.confidenceInResolution === "LOW" ? "Düşük" : "Orta"}
+              </span>
+            </div>
+          )}
+        </AiInsightCard>
       )}
 
       {/* Signal Chains */}

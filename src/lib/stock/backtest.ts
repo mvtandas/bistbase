@@ -83,7 +83,7 @@ function calcHorizonStats(
 
   const grossWins = wins.reduce((a, b) => a + b, 0);
   const grossLosses = losses.reduce((a, b) => a + b, 0);
-  const profitFactor = grossLosses > 0 ? Math.min(99, grossWins / grossLosses) : (grossWins > 0 ? 99 : 0);
+  const profitFactor = grossLosses > 0 ? Math.min(999, grossWins / grossLosses) : (grossWins > 0 ? 999 : 0);
 
   return {
     winRate: Math.round(winRate * 10) / 10,
@@ -150,11 +150,12 @@ function calcConfidence(h1d: TimeHorizonStats, h5d: TimeHorizonStats, h10d: Time
 }
 
 function getBestHorizon(h1d: TimeHorizonStats, h5d: TimeHorizonStats, h10d: TimeHorizonStats): "1D" | "5D" | "10D" {
-  const candidates: { horizon: "1D" | "5D" | "10D"; stats: TimeHorizonStats }[] = [
+  const all: { horizon: "1D" | "5D" | "10D"; stats: TimeHorizonStats }[] = [
     { horizon: "1D", stats: h1d },
     { horizon: "5D", stats: h5d },
     { horizon: "10D", stats: h10d },
-  ].filter(c => c.stats.sampleSize >= 3);
+  ];
+  const candidates = all.filter(c => c.stats.sampleSize >= 3);
 
   if (candidates.length === 0) return "1D";
   candidates.sort((a, b) => b.stats.winRate - a.stats.winRate);
