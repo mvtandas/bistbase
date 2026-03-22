@@ -79,6 +79,28 @@ export function TechnicalTab({ d, stockCode, timeLabel, teknikYorum, tyLoading, 
         </div>
       )}
 
+      {/* Volatility Regime */}
+      {d.volatilityRegime && (
+        <div className="rounded-lg border border-border/40 bg-card/30 p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium">Volatilite Rejimi</span>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              d.volatilityRegime.regime === "LOW" ? "bg-green-500/10 text-green-500" :
+              d.volatilityRegime.regime === "NORMAL" ? "bg-blue-500/10 text-blue-500" :
+              d.volatilityRegime.regime === "HIGH" ? "bg-amber-500/10 text-amber-500" :
+              "bg-red-500/10 text-red-500"
+            }`}>
+              {d.volatilityRegime.regimeTr}
+            </span>
+          </div>
+          {d.volatilityRegime.regimeShiftSignal && (
+            <div className="text-xs text-amber-400 mt-1">
+              ⚡ {d.volatilityRegime.regimeShiftSignal === "EXPANSION" ? "Volatilite genişliyor — kırılım olası" : "Volatilite daralıyor — sakinleşme"}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Core Technical Indicators with Gauges */}
       {t && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -332,6 +354,29 @@ export function TechnicalTab({ d, stockCode, timeLabel, teknikYorum, tyLoading, 
             {d.extraIndicators.kama != null && <div><div className="flex justify-between"><span className="text-muted-foreground/60 flex items-center gap-1">KAMA <InfoTooltip title="Adaptif Hareketli Ortalama" description="Trend güçlüyken hızlı, yatay piyasada yavaş tepki verir. Normal MA'lardan daha akıllı." /></span><span className={cn("font-medium", d.extraIndicators.priceVsKama === "ABOVE" ? "text-gain" : "text-loss")}>₺{d.extraIndicators.kama}</span></div></div>}
             {d.extraIndicators.williamsR != null && <div><div className="flex justify-between"><span className="text-muted-foreground/60 flex items-center gap-1">Williams %R <InfoTooltip title="Williams Yüzde Aralığı" description="-100 ile 0 arası. -80 altı aşırı satım, -20 üstü aşırı alım." /></span><span className={cn("font-medium", d.extraIndicators.williamsSignal === "OVERSOLD" ? "text-gain" : d.extraIndicators.williamsSignal === "OVERBOUGHT" ? "text-loss" : "")}>{d.extraIndicators.williamsR}</span></div><p className="text-[9px] text-muted-foreground/40 italic">{d.extraIndicators.williamsSignal === "OVERSOLD" ? "Aşırı satım — dip bölgesi" : d.extraIndicators.williamsSignal === "OVERBOUGHT" ? "Aşırı alım — tepe bölgesi" : "Normal aralıkta"}</p></div>}
             {d.extraIndicators.parabolicSar != null && <div><div className="flex justify-between"><span className="text-muted-foreground/60 flex items-center gap-1">Parabolic SAR <InfoTooltip title="Durma ve Dönüş" description="Trend takip göstergesi. Fiyatın altında = yükseliş trendi, üstünde = düşüş trendi." /></span><span className={cn("font-medium", d.extraIndicators.sarTrend === "BULLISH" ? "text-gain" : "text-loss")}>₺{d.extraIndicators.parabolicSar} ({d.extraIndicators.sarTrend === "BULLISH" ? "Yükseliş" : "Düşüş"})</span></div></div>}
+            {d.extraIndicators?.supertrend != null && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Supertrend</span>
+                <span className={`text-xs font-medium ${d.extraIndicators.supertrendDirection === "BULLISH" ? "text-gain" : "text-loss"}`}>
+                  ₺{d.extraIndicators.supertrend} {d.extraIndicators.supertrendDirection === "BULLISH" ? "↑ Yükseliş" : "↓ Düşüş"}
+                </span>
+              </div>
+            )}
+            {d.extraIndicators?.pivotPoints && (
+              <div className="mt-2 space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">Pivot Noktaları</span>
+                <div className="grid grid-cols-3 gap-1 text-xs">
+                  <div className="text-loss">S1: ₺{d.extraIndicators.pivotPoints.classic.s1}</div>
+                  <div className="text-center font-medium">PP: ₺{d.extraIndicators.pivotPoints.classic.pp}</div>
+                  <div className="text-gain">R1: ₺{d.extraIndicators.pivotPoints.classic.r1}</div>
+                </div>
+                {d.extraIndicators.nearestPivot && (
+                  <div className="text-xs text-muted-foreground">
+                    En yakın: {d.extraIndicators.nearestPivot.level} ₺{d.extraIndicators.nearestPivot.price} ({d.extraIndicators.nearestPivot.distance > 0 ? "+" : ""}{d.extraIndicators.nearestPivot.distance}%)
+                  </div>
+                )}
+              </div>
+            )}
             {d.extraIndicators.elderBullPower != null && <div><div className="flex justify-between"><span className="text-muted-foreground/60 flex items-center gap-1">Elder Bull <InfoTooltip title="Alıcı Gücü" description="Alıcıların fiyatı EMA üstüne taşıma gücü." /></span><span className={cn("font-medium", (d.extraIndicators.elderBullPower ?? 0) > 0 ? "text-gain" : "text-loss")}>{d.extraIndicators.elderBullPower}</span></div></div>}
             {d.extraIndicators.elderBearPower != null && <div><div className="flex justify-between"><span className="text-muted-foreground/60 flex items-center gap-1">Elder Bear <InfoTooltip title="Satıcı Gücü" description="Satıcıların fiyatı EMA altına çekme gücü." /></span><span className={cn("font-medium", (d.extraIndicators.elderBearPower ?? 0) < 0 ? "text-loss" : "text-gain")}>{d.extraIndicators.elderBearPower}</span></div></div>}
             {d.extraIndicators.ttmSqueeze && <div className="col-span-2 rounded-lg bg-amber-400/10 border border-amber-400/20 p-2"><span className="text-amber-400 font-medium flex items-center gap-1">&#x26A1; TTM Squeeze aktif <InfoTooltip title="Volatilite Sıkışması" description="Bollinger bantları Keltner kanalının içine girdi. Piyasa sıkışıyor, yakında güçlü bir kırılım hareketi bekleniyor." /></span><p className="text-[9px] text-muted-foreground/50 mt-0.5">Bollinger bantları sıkıştı — yön belirlendikten sonra güçlü hareket gelir</p></div>}

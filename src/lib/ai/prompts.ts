@@ -48,6 +48,8 @@ function formatExtraIndicators(input: StockAnalysisInputV2): string {
   if (e.williamsR != null) lines.push(`Williams %R: ${e.williamsR} [${e.williamsSignal === "OVERBOUGHT" ? "AŞIRI ALIM" : e.williamsSignal === "OVERSOLD" ? "AŞIRI SATIM" : "normal"}]`);
   if (e.parabolicSar != null) lines.push(`Parabolic SAR: ₺${e.parabolicSar} → ${e.sarTrend === "BULLISH" ? "YÜKSELİŞ trendi" : "DÜŞÜŞ trendi"}`);
   if (e.elderBullPower != null) lines.push(`Elder Ray: Bull ${e.elderBullPower} | Bear ${e.elderBearPower}`);
+  if (e.supertrend != null) lines.push(`Supertrend: ₺${e.supertrend} → ${e.supertrendDirection === "BULLISH" ? "YÜKSELİŞ trendi" : "DÜŞÜŞ trendi"}`);
+  if (e.nearestPivot) lines.push(`En Yakın Pivot: ${e.nearestPivot.level} ₺${e.nearestPivot.price} (${e.nearestPivot.distance > 0 ? "+" : ""}${e.nearestPivot.distance}% uzak)`);
   if (e.ttmSqueeze) lines.push(`⚡ TTM SQUEEZE AKTİF — Bollinger bantları Keltner kanalının içinde, çok güçlü kırılım bekleniyor`);
   return lines.length > 0 ? lines.join("\n") : "";
 }
@@ -102,7 +104,33 @@ function formatMacro(input: StockAnalysisInputV2): string {
   if (m.dxy != null) lines.push(`DXY: ${fmt(m.dxy, 1)} (${(m.dxyChange ?? 0) >= 0 ? "+" : ""}${fmt(m.dxyChange)}%)`);
   if (m.vix != null) lines.push(`VIX: ${fmt(m.vix, 1)} → ${m.vix < 15 ? "Risk iştahı yüksek" : m.vix < 25 ? "Normal" : "TEDİRGİNLİK"}`);
   if (m.bist100 != null) lines.push(`BİST 100: ${m.bist100.toLocaleString("tr-TR")} (${(m.bist100Change ?? 0) >= 0 ? "+" : ""}${fmt(m.bist100Change)}%)`);
+  // TCMB verileri
+  if (m.tcmbPolicyRate != null) lines.push(`TCMB Politika Faizi: %${fmt(m.tcmbPolicyRate, 1)} | Enflasyon (TÜFE): %${fmt(m.tcmbInflation, 1)} | Reel Faiz: %${fmt(m.tcmbRealRate, 1)}`);
+  if (m.tcmbReserves != null) lines.push(`Döviz Rezervi: $${fmt(m.tcmbReserves, 1)} milyar`);
   return lines.join("\n");
+}
+
+function formatTCMB(input: StockAnalysisInputV2): string {
+  const m = input.macroData;
+  if (!m) return "TCMB verisi yok.";
+  // TCMB verileri formatMacro içinde de yer alır; burada politika bağlamı vurgulanır.
+  const lines: string[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ma = m as any;
+  const tcmbRate = ma.tcmbPolicyRate as number | undefined;
+  const tcmbInf = ma.tcmbInflation as number | undefined;
+  const tcmbReal = ma.tcmbRealRate as number | undefined;
+  const tcmbRes = ma.tcmbReserves as number | undefined;
+  if (tcmbRate != null) lines.push(`TCMB Politika Faizi: %${fmt(tcmbRate, 1)} | TÜFE Enflasyon: %${fmt(tcmbInf, 1)} | Reel Faiz: %${fmt(tcmbReal, 1)}`);
+  if (tcmbRes != null) lines.push(`Döviz Rezervi: $${fmt(tcmbRes, 1)} milyar`);
+  return lines.length > 0 ? lines.join("\n") : "TCMB verisi henüz alınamadı.";
+}
+
+function formatContextSection(input: StockAnalysisInputV2): string {
+  const parts: string[] = [];
+  if (input.seasonalLabel) parts.push(`Mevsimsellik: ${input.seasonalLabel}`);
+  if (input.multiTimeframeAlignment) parts.push(`Multi-Timeframe: ${input.multiTimeframeAlignment}`);
+  return parts.length > 0 ? parts.join("\n") : "";
 }
 
 function formatRisk(input: StockAnalysisInputV2): string {
@@ -177,7 +205,8 @@ export function buildAnalysisPrompt(input: StockAnalysisInputV2): string {
   const seasonSection = input.seasonalLabel ? `Mevsimsellik: ${input.seasonalLabel}` : "";
   const mtfSection = input.multiTimeframeAlignment ? `Multi-Timeframe: ${input.multiTimeframeAlignment}` : "";
 
-  return `Sen ${input.stockCode} hissesini analiz eden BİST uzmanısın. ${tf.label} (${tf.bars}) bazında 10 katmanlı veri sağlanıyor.
+  return `BİST ${input.stockCode} ${tf.label} analizi. SADECE JSON döndür. Türkçe yaz.
+KURAL: Sadece verideki sayılara dayanarak yorum yap, spekülasyon yapma.
 ${tf.periodNote}
 
 ═══ FİYAT (${tf.label}) ═══
@@ -213,21 +242,42 @@ ${chainSection ? `\nSinyal Zincirleri:\n${chainSection}` : ""}
 ═══ 9. BAĞLAM ═══
 ${seasonSection ? seasonSection + "\n" : ""}${mtfSection ? mtfSection + "\n" : ""}
 
-═══ 10. HABERLER ═══
+═══ 10. TCMB & EKONOMİK ORTAM ═══
+${formatTCMB(input)}
+
+═══ 11. MEVSİMSELLİK & BAĞLAM ═══
+${formatContextSection(input)}
+
+═══ 12. HABERLER ═══
 ${newsSection}
 
 ═══ GÖREV (${tf.label} ANALİZ) ═══
-${tf.bars.toUpperCase()} bazında tüm 10 katmanı değerlendir. ${tf.perspective} teknik göstergeleri, mum formasyonlarını, Ichimoku bulutunu, Fibonacci seviyelerini yorumla. Sinyal zincirleri varsa vurgula.
+${tf.bars.toUpperCase()} bazında tüm 12 katmanı değerlendir. ${tf.perspective} teknik göstergeleri, mum formasyonlarını, Ichimoku bulutunu, Fibonacci seviyelerini yorumla. Sinyal zincirleri varsa vurgula.
 
-1. "summaryText": ${tf.summaryInstruction}
-2. "bullCase": ${tf.bullInstruction}
-3. "bearCase": ${tf.bearInstruction}
-4. "sentimentValue": -100..+100
-5. "confidence": "HIGH" (tüm katmanlar aynı yönü gösteriyor, sinyaller uyumlu) / "MEDIUM" (karışık sinyaller var ama genel yön belli) / "LOW" (zıt sinyaller çok, belirsizlik yüksek)
-6. "verdictReason": Tek cümleyle bu hisseye ne yapılmalı? Skor, sinyaller ve temel durumu özetleyen kısa, açıkça yönlendirici bir cümle. Örnek: "Teknik göstergeler ve güçlü hacim desteği ile kısa vadede yükseliş potansiyeli yüksek." veya "Zayıf temel ve düşüş trendi nedeniyle temkinli olunmalı."
+ÖNEMLİ: Sadece veriyle desteklenebilen çıkarımlar yap, spekülasyon yapma.
+
+ADIM 1 - DÜŞÜNME:
+Önce "reasoning" alanında adım adım düşün:
+- Hangi katmanlar aynı yönü gösteriyor?
+- Hangi katmanlar çelişiyor?
+- Verinin kalitesi nasıl? Eksik veya şüpheli veri var mı?
+
+ADIM 2 - ŞEYTANIN AVUKATI:
+"counterArgument" alanında sonucunun KARŞISINDA en güçlü argümanı belirle. Eğer bu karşı argüman sonucunu değiştiriyorsa, sonucunu revize et.
+
+ADIM 3 - SONUÇ:
+1. "reasoning": Adım adım analiz mantığın (2-3 cümle, hangi katmanlar ağır bastı ve neden)
+2. "counterArgument": Sonucunun karşısındaki en güçlü argüman (1-2 cümle)
+3. "dataQualityNote": Eksik/eski/şüpheli veri uyarısı (yoksa "Veri kalitesi normal")
+4. "summaryText": ${tf.summaryInstruction}
+5. "bullCase": ${tf.bullInstruction}
+6. "bearCase": ${tf.bearInstruction}
+7. "sentimentValue": -100..+100
+8. "confidence": "HIGH" (tüm katmanlar aynı yönü gösteriyor, sinyaller uyumlu) / "MEDIUM" (karışık sinyaller var ama genel yön belli) / "LOW" (zıt sinyaller çok, belirsizlik yüksek)
+9. "verdictReason": Tek cümleyle bu hisseye ne yapılmalı? Skor, sinyaller ve temel durumu özetleyen kısa, açıkça yönlendirici bir cümle.
 
 Türkçe, sade, sayılara referans ver, tavsiye verme.
 
 JSON:
-{"summaryText":"...","bullCase":"...","bearCase":"...","sentimentValue":0,"confidence":"MEDIUM","verdictReason":"..."}`;
+{"reasoning":"...","counterArgument":"...","dataQualityNote":"...","summaryText":"...","bullCase":"...","bearCase":"...","sentimentValue":0,"confidence":"MEDIUM","verdictReason":"..."}`;
 }

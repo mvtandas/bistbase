@@ -49,6 +49,7 @@ export async function saveInsight(
   todayUTC: Date,
   result: object,
   timeframe = "daily",
+  options?: { promptVersion?: string; aiProvider?: string },
 ): Promise<void> {
   const redisKey = `ai:${stockCode}:${insightType}:${timeframe}:${todayUTC.toISOString().split("T")[0]}`;
 
@@ -69,10 +70,14 @@ export async function saveInsight(
       timeframe,
       resultJson: result,
       status: "COMPLETED",
+      promptVersion: options?.promptVersion,
+      aiProvider: options?.aiProvider,
     },
     update: {
       resultJson: result,
       status: "COMPLETED",
+      promptVersion: options?.promptVersion,
+      aiProvider: options?.aiProvider,
     },
   });
 

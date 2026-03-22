@@ -50,23 +50,22 @@ export async function getSignalAccuracyMap(): Promise<Map<string, SignalAccuracy
   const result = new Map<string, SignalAccuracy>();
 
   for (const [type, data] of grouped) {
-    if (data.total < 2) continue;
-
     const accuracyRate = (data.accurate / data.total) * 100;
 
-    // Güç çarpanı: %70+ doğruluk = güçlendir, %40- = zayıflat
-    const isLowSample = data.total < 5;
+    // Insufficient data — neutral strength, no adjustment
     let adjustedStrength = 1.0;
-    if (accuracyRate >= 80) adjustedStrength = isLowSample ? 1.15 : 1.3;
-    else if (accuracyRate >= 70) adjustedStrength = isLowSample ? 1.08 : 1.15;
-    else if (accuracyRate >= 60) adjustedStrength = 1.0;
-    else if (accuracyRate >= 50) adjustedStrength = isLowSample ? 0.95 : 0.9;
-    else if (accuracyRate >= 40) adjustedStrength = isLowSample ? 0.85 : 0.75;
-    else adjustedStrength = isLowSample ? 0.7 : 0.5;
-
-    // Reliability label for UI display
     let reliabilityLabel: SignalAccuracy["reliabilityLabel"] = "INSUFFICIENT";
-    if (data.total >= 5) {
+
+    if (data.total >= 10) {
+      // Güç çarpanı: %70+ doğruluk = güçlendir, %40- = zayıflat
+      if (accuracyRate >= 80) adjustedStrength = 1.3;
+      else if (accuracyRate >= 70) adjustedStrength = 1.15;
+      else if (accuracyRate >= 60) adjustedStrength = 1.0;
+      else if (accuracyRate >= 50) adjustedStrength = 0.9;
+      else if (accuracyRate >= 40) adjustedStrength = 0.75;
+      else adjustedStrength = 0.5;
+
+      // Reliability label for UI display
       if (accuracyRate >= 65) reliabilityLabel = "HIGH";
       else if (accuracyRate >= 50) reliabilityLabel = "MEDIUM";
       else reliabilityLabel = "LOW";
@@ -95,7 +94,8 @@ export function calibrateSignalStrength(
   accuracyMap: Map<string, SignalAccuracy>
 ): number {
   const accuracy = accuracyMap.get(signalType);
-  if (!accuracy) return originalStrength; // Yeterli veri yoksa orijinal güç
+  if (!accuracy) return originalStrength; // Veri yoksa orijinal güç
+  if (accuracy.reliabilityLabel === "INSUFFICIENT") return originalStrength; // < 10 sample — ayarlama yapma
 
   const calibrated = Math.round(originalStrength * accuracy.adjustedStrength);
   return Math.max(10, Math.min(100, calibrated));

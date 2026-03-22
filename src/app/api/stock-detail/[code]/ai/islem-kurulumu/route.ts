@@ -8,10 +8,11 @@ import { detectChartPatterns } from "@/lib/stock/chart-patterns";
 import { calculateExtraIndicators } from "@/lib/stock/extra-indicators";
 import { detectSignalChains } from "@/lib/stock/signal-chains";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
-import { generateSpecializedInsight } from "@/lib/ai/specialized";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
 import { buildIslemKurulumuPrompt } from "@/lib/ai/specialized-prompts";
-import type { IslemKurulumuOutput } from "@/lib/ai/types";
+import { IslemKurulumuSchema } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -20,21 +21,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
 }
 
-function validateIslemKurulumu(parsed: Record<string, unknown>): IslemKurulumuOutput | null {
-  if (typeof parsed.setupDetected !== "boolean") return null;
-  return {
-    setupDetected: parsed.setupDetected,
-    setupName: typeof parsed.setupName === "string" ? parsed.setupName : "",
-    setupType: (["BREAKOUT", "REVERSAL", "TREND_CONTINUATION", "MEAN_REVERSION"].includes(parsed.setupType as string) ? parsed.setupType : "BREAKOUT") as "BREAKOUT" | "REVERSAL" | "TREND_CONTINUATION" | "MEAN_REVERSION",
-    description: typeof parsed.description === "string" ? parsed.description : "",
-    triggerCondition: typeof parsed.triggerCondition === "string" ? parsed.triggerCondition : "",
-    invalidation: typeof parsed.invalidation === "string" ? parsed.invalidation : "",
-    historicalWinRate: typeof parsed.historicalWinRate === "string" ? parsed.historicalWinRate : "",
-    timeframe: typeof parsed.timeframe === "string" ? parsed.timeframe : "",
-    confluenceScore: typeof parsed.confluenceScore === "number" ? Math.min(10, Math.max(0, parsed.confluenceScore)) : 0,
-    status: (["ACTIVE", "PENDING", "EXPIRED"].includes(parsed.status as string) ? parsed.status : "PENDING") as "ACTIVE" | "PENDING" | "EXPIRED",
-  };
-}
 
 export async function GET(
   _request: NextRequest,
@@ -76,13 +62,13 @@ export async function GET(
       signalChains, technicals, extraIndicators, multiTimeframe, signals,
     });
 
-    const result = await generateSpecializedInsight(prompt.system, prompt.user, validateIslemKurulumu);
+    const result = await generateSpecializedInsightWithSchema(prompt.system, prompt.user, IslemKurulumuSchema);
 
     if (!result) {
       return NextResponse.json({ error: "AI analizi uretilemedi" }, { status: 500 });
     }
 
-    await saveInsight(stockCode, insightType, todayUTC, result as object);
+    await saveInsight(stockCode, insightType, todayUTC, result as object, "daily", { promptVersion: getPromptVersion("islem-kurulumu") });
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

@@ -106,9 +106,19 @@ export async function analyzeMultiTimeframe(
     alignmentTr = "Haftalık trend destekliyor, günlük konsolidasyon";
     signalBonus = 8;
   } else if ((wDown && dUp) || (wUp && dDown)) {
-    alignment = "CONFLICTING";
-    alignmentTr = "Haftalık ve günlük trendler çelişiyor — dikkat!";
-    signalBonus = -12;
+    // Haftalık güçlü trend + günlük ters yön → pullback fırsatı olabilir
+    const weeklyStrong = weeklyTrend === "STRONG_UP" || weeklyTrend === "STRONG_DOWN";
+    if (weeklyStrong) {
+      alignment = "MIXED";
+      alignmentTr = weeklyTrend === "STRONG_UP"
+        ? "Haftalık güçlü yükseliş — günlük geri çekilme fırsatı olabilir"
+        : "Haftalık güçlü düşüş — günlük toparlanma geçici olabilir";
+      signalBonus = 5; // Pullback fırsatı — hafif pozitif
+    } else {
+      alignment = "CONFLICTING";
+      alignmentTr = "Haftalık ve günlük trendler çelişiyor — dikkat!";
+      signalBonus = -20;
+    }
   } else {
     alignment = "MIXED";
     alignmentTr = "Haftalık trend belirsiz, dikkatli olunmalı";

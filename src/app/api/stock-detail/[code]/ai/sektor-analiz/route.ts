@@ -4,10 +4,11 @@ import { getFundamentalData, scoreFundamentals } from "@/lib/stock/fundamentals"
 import { getMacroData } from "@/lib/stock/macro";
 import { calculateSectorContext } from "@/lib/stock/sectors";
 import { getPeerComparison } from "@/lib/stock/peers";
-import { generateSpecializedInsight } from "@/lib/ai/specialized";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
 import { buildSektorAnalizPrompt } from "@/lib/ai/specialized-prompts";
-import type { SektorAnalizOutput } from "@/lib/ai/types";
+import { SektorAnalizSchema } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -16,17 +17,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
 }
 
-function validateSektorAnaliz(parsed: Record<string, unknown>): SektorAnalizOutput | null {
-  if (typeof parsed.positionSummary !== "string") return null;
-  if (typeof parsed.competitiveAdvantage !== "string") return null;
-  return {
-    positionSummary: parsed.positionSummary,
-    competitiveAdvantage: parsed.competitiveAdvantage,
-    valuationComparison: typeof parsed.valuationComparison === "string" ? parsed.valuationComparison : "",
-    sectorOutlook: typeof parsed.sectorOutlook === "string" ? parsed.sectorOutlook : "",
-    betterAlternative: typeof parsed.betterAlternative === "string" ? parsed.betterAlternative : null,
-  };
-}
 
 export async function GET(
   _request: NextRequest,
@@ -62,13 +52,13 @@ export async function GET(
       fundamentalScore, macroData,
     });
 
-    const result = await generateSpecializedInsight(prompt.system, prompt.user, validateSektorAnaliz);
+    const result = await generateSpecializedInsightWithSchema(prompt.system, prompt.user, SektorAnalizSchema);
 
     if (!result) {
       return NextResponse.json({ error: "AI analizi uretilemedi" }, { status: 500 });
     }
 
-    await saveInsight(stockCode, insightType, todayUTC, result as object);
+    await saveInsight(stockCode, insightType, todayUTC, result as object, "daily", { promptVersion: getPromptVersion("sektor-analiz") });
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

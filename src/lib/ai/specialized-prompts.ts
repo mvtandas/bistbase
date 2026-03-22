@@ -44,22 +44,22 @@ export function buildAkilliOzetPrompt(input: AkilliOzetInput): { system: string;
   const fundScore = input.fundamentalScore?.fundamentalScore ?? "—";
 
   return {
-    system: `Sen kıdemli bir BİST analistisin. Yönetici brifingleri hazırlarsın. Çıktın SADECE JSON formatında olmalı. Türkçe yaz. Kısa ve öz ol.`,
-    user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)} | Değişim: %${fmt(input.changePercent)}
+    system: `Sen kıdemli BİST analistisin. SADECE JSON döndür, başka metin yazma. Türkçe yaz.
+KURAL: Sadece verideki sayılara dayanarak yorum yap. Tahmin/spekülasyon yapma.`,
+    user: `${input.stockCode} | ₺${fmt(input.price)} | %${fmt(input.changePercent)}
 
-KOMPOZİT SKOR: ${s?.composite ?? "—"}/100 (${s?.labelTr ?? "—"})
-Alt Skorlar: Teknik ${s?.technical ?? "—"} | Momentum ${s?.momentum ?? "—"} | Hacim ${s?.volume ?? "—"} | Temel ${fundScore} | Makro ${macroScore} | Duyarlılık ${s?.sentiment ?? "—"} | Volatilite ${s?.volatility ?? "—"}
-Risk: ${riskLevel} | Mevsimsellik: ${season}
-En güçlü sinyaller: ${topSignals || "Aktif sinyal yok"}
+SKOR: ${s?.composite ?? "—"}/100 (${s?.labelTr ?? "—"}) | Teknik ${s?.technical ?? "—"} | Momentum ${s?.momentum ?? "—"} | Hacim ${s?.volume ?? "—"} | Temel ${fundScore} | Makro ${macroScore} | Volatilite ${s?.volatility ?? "—"}
+Risk: ${riskLevel} | Mevsim: ${season}
+Sinyaller: ${topSignals || "Yok"}
 
-GÖREV: Yönetici brifing oluştur.
-1. "tldr": Tek cümle, hissenin şu anki durumu ve yönü (max 30 kelime)
-2. "bullets": 5-6 madde, her boyutu kapsayan. Her madde: {"icon": "🟢"/"🔴"/"🟡", "text": "...", "category": "technical"/"fundamental"/"macro"/"risk"}
-3. "timeHorizon": {"shortTerm": "1-5 gün: ...", "mediumTerm": "1-4 hafta: ...", "longTerm": "1-3 ay: ..."}
-4. "watchlist": 2-3 izlenmesi gereken tetikleyici (örn. "RSI 70'i geçerse...", "USD/TRY 38'i aşarsa...")
+ÇIKTI FORMATI (bu yapıya uy):
+{"tldr":"Tek cümle özet max 30 kelime","bullets":[{"icon":"🟢","text":"RSI 42 ile nötr bölgede","category":"technical"},{"icon":"🔴","text":"F/K 18.5 sektör ortalaması üstünde","category":"fundamental"}],"timeHorizon":{"shortTerm":"1-5 gün: ...","mediumTerm":"1-4 hafta: ...","longTerm":"1-3 ay: ..."},"watchlist":["RSI 70 geçerse...","Destek ₺X kırılırsa..."]}
 
-JSON:
-{"tldr":"...","bullets":[...],"timeHorizon":{...},"watchlist":[...]}`,
+bullets: 5-6 madde, category: "technical"/"fundamental"/"macro"/"risk"
+icon: 🟢 olumlu, 🔴 olumsuz, 🟡 nötr
+watchlist: 2-3 somut tetikleyici
+
+JSON:`,
   };
 }
 
@@ -93,10 +93,14 @@ export function buildGirisCikisPrompt(input: GirisCikisInput): { system: string;
   if (t?.atr14 != null) levels.push(`ATR(14): ₺${t.atr14}`);
   if (e?.vwap != null) levels.push(`VWAP: ₺${e.vwap}`);
   if (e?.parabolicSar != null) levels.push(`Parabolic SAR: ₺${e.parabolicSar} (${e.sarTrend})`);
+  if (e?.supertrend != null) levels.push(`Supertrend: ₺${e.supertrend} (${e.supertrendDirection === "BULLISH" ? "YÜKSELİŞ" : "DÜŞÜŞ"})`);
+  if (e?.nearestPivot) levels.push(`Pivot: ${e.nearestPivot.level} ₺${e.nearestPivot.price} (${e.nearestPivot.distance > 0 ? "+" : ""}${e.nearestPivot.distance}%)`);
+  if (e?.pivotPoints) levels.push(`Pivot S1: ₺${e.pivotPoints.classic.s1} | PP: ₺${e.pivotPoints.classic.pp} | R1: ₺${e.pivotPoints.classic.r1}`);
   if (t?.ma20 != null) levels.push(`MA20: ₺${t.ma20} | MA50: ₺${t.ma50 ?? "—"} | MA200: ₺${t.ma200 ?? "—"}`);
 
   return {
-    system: `Sen teknik analiz uzmanısın. Giriş/çıkış noktaları ve stop-loss seviyeleri belirlersin. Çıktın SADECE JSON. Türkçe yaz. Somut fiyat seviyeleri ver.`,
+    system: `Sen teknik analiz uzmanısın. SADECE JSON döndür. Türkçe yaz. Somut ₺ fiyat seviyeleri ver.
+KURAL: Her giriş seviyesi en az 2 confluence (örn: Fibonacci + Destek, Pivot + MA) gerektirmeli. Tek indikatöre dayalı seviye önerme.`,
     user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)}
 
 TEKNİK SEVİYELER:
@@ -162,7 +166,8 @@ export function buildTeknikYorumPrompt(input: TeknikYorumInput): { system: strin
     : "";
 
   return {
-    system: `Sen deneyimli bir grafik formasyonu uzmanısın. Formasyonların NEDEN oluştuğunu ve ne anlama geldiğini açıklarsın. Çıktın SADECE JSON. Türkçe yaz.`,
+    system: `Sen grafik formasyonu uzmanısın. SADECE JSON döndür. Türkçe yaz.
+KURAL: Sadece verideki somut formasyonları yorumla. Formasyon yoksa patternReliability: "LOW" döndür.`,
     user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)}
 
 MUM FORMASYONLARI:
@@ -222,7 +227,8 @@ export function buildSinyalCozumPrompt(input: SinyalCozumInput): { system: strin
   const mtfStr = mtf ? `Multi-TF Uyum: ${mtf.alignmentTr} | Haftalık: ${mtf.weekly.trend} | Günlük: ${mtf.daily.trend}` : "";
 
   return {
-    system: `Sen sinyal analiz uzmanısın. Çatışan sinyalleri tarihsel doğruluk oranlarıyla değerlendirip çözersin. Çıktın SADECE JSON. Türkçe yaz.`,
+    system: `Sen sinyal analiz uzmanısın. SADECE JSON döndür. Türkçe yaz.
+KURAL: Sinyalleri WR (win rate) ve güç değerine göre sırala. WR verisi yoksa güvenme. Düşük örneklem (<10) sinyallerini göz ardı et.`,
     user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)}
 
 YÜKSELİŞ SİNYALLERİ (${bullSignals.length}):
@@ -276,6 +282,10 @@ export function buildRiskSenaryoPrompt(input: RiskSenaryoInput): { system: strin
   }
   if (m) {
     riskLines.push(`Makro: USD/TRY ₺${fmt(m.usdTry)} (%${fmt(m.usdTryChange)}) | VIX: ${fmt(m.vix)} | DXY: ${fmt(m.dxy)}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ma = m as any;
+    if (ma.tcmbPolicyRate != null) riskLines.push(`TCMB Politika Faizi: %${fmt(ma.tcmbPolicyRate, 1)} | Enflasyon (TÜFE): %${fmt(ma.tcmbInflation, 1)} | Reel Faiz: %${fmt(ma.tcmbRealRate, 1)}`);
+    if (ma.tcmbReserves != null) riskLines.push(`Döviz Rezervi: $${fmt(ma.tcmbReserves, 1)} milyar`);
   }
   if (f) {
     riskLines.push(`Borç/Özsermaye: ${fmt(f.debtToEquity)} | Cari Oran: ${fmt(f.currentRatio)}`);
@@ -284,7 +294,8 @@ export function buildRiskSenaryoPrompt(input: RiskSenaryoInput): { system: strin
   const sectorStr = input.sectorContext ? `Sektör: ${input.sectorContext.sectorName}` : "";
 
   return {
-    system: `Sen risk analizi uzmanısın. Spesifik risk senaryoları oluşturur ve korunma önerileri verirsin. Çıktın SADECE JSON. Türkçe yaz.`,
+    system: `Sen risk analizi uzmanısın. SADECE JSON döndür. Türkçe yaz.
+KURAL: Senaryoları VaR, MaxDD, Beta ve stres test verilerine dayandır. Olasılıkları somut metriklere göre belirle, tahmin yapma.`,
     user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)} | ${sectorStr}
 
 RİSK VERİLERİ:
@@ -331,7 +342,8 @@ export function buildSektorAnalizPrompt(input: SektorAnalizInput): { system: str
   ).join("\n") ?? "Emsal verisi yok";
 
   return {
-    system: `Sen sektör analisti ve emsal karşılaştırma uzmanısın. Hisse pozisyonunu sektör içinde değerlendirirsin. Çıktın SADECE JSON. Türkçe yaz.`,
+    system: `Sen sektör analisti ve emsal karşılaştırma uzmanısın. SADECE JSON döndür. Türkçe yaz.
+KURAL: Karşılaştırmaları F/K, PD/DD, ROE sayılarına dayandır. Rakip verisi eksikse bunu belirt.`,
     user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)} | Değişim: %${fmt(input.changePercent)}
 
 SEKTÖR: ${sc?.sectorName ?? "—"} | Sektör Değişim: %${fmt(sc?.sectorChange)} | Göreceli Güç: %${fmt(sc?.relativeStrength)} | ${sc?.outperforming ? "ÜSTÜN PERFORMANS" : "DÜŞÜK PERFORMANS"}
@@ -400,7 +412,8 @@ export function buildIslemKurulumuPrompt(input: IslemKurulumuInput): { system: s
   if (t?.atr14 != null) setupData.push(`ATR: ₺${t.atr14}`);
 
   return {
-    system: `Sen trade setup uzmanısın. Yüksek olasılıklı işlem kurulumlarını tespit edersin. Çıktın SADECE JSON. Türkçe yaz. Setup yoksa setupDetected: false döndür.`,
+    system: `Sen trade setup uzmanısın. SADECE JSON döndür. Türkçe yaz. Setup yoksa setupDetected:false döndür.
+KURAL: Setup en az 3 confluence faktörü gerektirmeli. Tek indikatöre dayalı setup önerme. confluenceScore: kaç faktör uyumlu (1-10).`,
     user: `${input.stockCode} | Fiyat: ₺${fmt(input.price)}
 
 SETUP VERİLERİ:

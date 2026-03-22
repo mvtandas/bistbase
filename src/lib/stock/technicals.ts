@@ -4,7 +4,7 @@
  * Tüm hesaplamalar finansal standartlara uygun.
  */
 
-import { getAdaptivePeriod } from "./adaptive";
+import { getAdaptivePeriod, getAdaptiveRSIPeriod, getAdaptiveBBMultiplier } from "./adaptive";
 
 export interface HistoricalBar {
   date: string;
@@ -233,15 +233,15 @@ function calculateMACD(closes: number[], fastPeriod = 12, slowPeriod = 26, signa
 // BOLLINGER BANDS (20, 2)
 // ════════════════════════════════════════
 
-function calculateBollinger(closes: number[], period = 20): {
+function calculateBollinger(closes: number[], period = 20, multiplier = 2): {
   upper: number; middle: number; lower: number;
   width: number; percentB: number;
 } | null {
   if (closes.length < period) return null;
   const middle = sma(closes, period)!;
   const sd = stddev(closes, period)!;
-  const upper = middle + 2 * sd;
-  const lower = middle - 2 * sd;
+  const upper = middle + multiplier * sd;
+  const lower = middle - multiplier * sd;
   const width = middle > 0 ? (upper - lower) / middle : 0;
   const price = closes[closes.length - 1];
   const percentB = upper !== lower ? (price - lower) / (upper - lower) : 0.5;
@@ -693,8 +693,9 @@ export function calculateFullTechnicals(
   const atrPercent = atr14 != null && price > 0 ? (atr14 / price) * 100 : null;
 
   // Adaptive periods (volatiliteye göre ayarla)
-  const rsiPeriod = getAdaptivePeriod(p.rsi, atrPercent);
+  const rsiPeriod = atrPercent != null ? getAdaptiveRSIPeriod(atrPercent) : p.rsi;
   const bbPeriod = getAdaptivePeriod(p.bb, atrPercent);
+  const adaptiveBBMult = atrPercent != null ? getAdaptiveBBMultiplier(atrPercent) : 2;
   const stochPeriod = getAdaptivePeriod(p.stoch, atrPercent);
 
   // RSI
@@ -720,7 +721,7 @@ export function calculateFullTechnicals(
   }
 
   // Bollinger
-  const bb = calculateBollinger(closes, bbPeriod);
+  const bb = calculateBollinger(closes, bbPeriod, adaptiveBBMult);
   const bbSqueeze = bb ? bb.width < 0.05 : false;
 
   // Stochastic

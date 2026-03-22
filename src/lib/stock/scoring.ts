@@ -43,7 +43,7 @@ const REGIME_WEIGHTS: Record<VolatilityRegime, Weights> = {
 // Timeframe bazlı ağırlık ayarları — haftalık/aylıkta temel ve makro daha önemli
 const TIMEFRAME_ADJUSTMENTS: Record<Timeframe, Partial<Weights>> = {
   daily:   {},
-  weekly:  { fundamental: 0.05, macro: 0.05, technical: -0.02, momentum: -0.03, volume: -0.05 },
+  weekly:  { fundamental: 0.05, macro: 0.05, technical: 0.03, momentum: -0.03, volume: -0.05 },
   monthly: { fundamental: 0.10, macro: 0.10, technical: -0.05, momentum: -0.07, volume: -0.08 },
 };
 
@@ -153,8 +153,8 @@ function scoreMomentum(t: FullTechnicalData): number {
   let score = 50;
 
   if (t.macdHistogram != null) {
-    if (t.macdHistogram > 0) score += t.macdCrossover === "BULLISH_CROSS" ? 20 : 10;
-    else score -= t.macdCrossover === "BEARISH_CROSS" ? 20 : 10;
+    if (t.macdHistogram > 0) score += t.macdCrossover === "BULLISH_CROSS" ? 15 : 10;
+    else score -= t.macdCrossover === "BEARISH_CROSS" ? 15 : 10;
   }
 
   if (t.stochK != null) {
@@ -165,8 +165,11 @@ function scoreMomentum(t: FullTechnicalData): number {
 
   if (t.adx14 != null && t.plusDI != null && t.minusDI != null) {
     const bullish = t.plusDI > t.minusDI;
-    if (t.adx14 >= 25) score += bullish ? 15 : -15;
-    else if (t.adx14 < 15) score -= 5;
+    if (t.adx14 >= 15) {
+      const adxBonus = Math.min(20, Math.round((t.adx14 - 15) * 0.8));
+      score += bullish ? adxBonus : -adxBonus;
+    }
+    if (t.adx14 < 15) score -= 5;
   }
 
   if (t.crossSignal === "GOLDEN_CROSS") score += 10;
@@ -272,15 +275,46 @@ export function calculateCompositeScore(
   fundamentalScore?: FundamentalScore | null,
   macroData?: MacroData | null,
   sectorCode?: string | null,
-  timeframe: Timeframe = "daily"
+  timeframe: Timeframe = "daily",
+  extras?: {
+    volatilityRegime?: { regime: string; volExpanding: boolean; volContracting: boolean } | null;
+    turkishSeasonality?: { overallBias: string; tcmbDecisionProximity: boolean; specialPeriod: string | null } | null;
+    indexInclusion?: { currentIndices: string[] } | null;
+  },
 ): CompositeScore {
   const technical = scoreTechnical(technicals, price);
   const momentum = scoreMomentum(technicals);
-  const volume = scoreVolume(technicals);
-  const volatility = scoreVolatility(technicals);
-  const sentiment = scoreSentiment(sentimentValue);
+  let volume = scoreVolume(technicals);
+  let volatility = scoreVolatility(technicals);
+  let sentiment = scoreSentiment(sentimentValue);
   const fundamental = fundamentalScore?.fundamentalScore ?? 50;
   const macro = macroData?.macroScore ?? 50;
+
+  // A2: Türk mevsimsellik → sentiment ayarlaması (max ±8 puan)
+  if (extras?.turkishSeasonality) {
+    const ts = extras.turkishSeasonality;
+    if (ts.overallBias === "BULLISH") sentiment = clamp(sentiment + 5);
+    else if (ts.overallBias === "BEARISH") sentiment = clamp(sentiment - 5);
+    if (ts.tcmbDecisionProximity) sentiment = clamp(sentiment - 3);
+    if (ts.specialPeriod === "YILSONU") sentiment = clamp(sentiment + 3);
+  }
+
+  // A3: Endeks üyeliği → volume/likidite bonusu (max ±5 puan)
+  if (extras?.indexInclusion) {
+    const indices = extras.indexInclusion.currentIndices;
+    if (indices.includes("BIST30")) volume = clamp(volume + 5);
+    else if (indices.includes("BIST50")) volume = clamp(volume + 3);
+    else if (indices.length === 0) volume = clamp(volume - 3);
+  }
+
+  // A1: EWMA volatilite rejimi → volatility sub-score ayarlaması
+  if (extras?.volatilityRegime) {
+    const vr = extras.volatilityRegime;
+    if (vr.volExpanding) volatility = clamp(volatility + 5);   // kırılım fırsatı
+    if (vr.volContracting) volatility = clamp(volatility - 3); // düşük hareket
+    // EWMA EXTREME ama yerel rejim düşükse → volatility'yi düşür
+    if (vr.regime === "EXTREME") volatility = clamp(volatility - 10);
+  }
 
   // Dinamik ağırlıklar — rejim + sektör + timeframe bazlı
   const w = getWeights(macroData, sectorCode, timeframe);

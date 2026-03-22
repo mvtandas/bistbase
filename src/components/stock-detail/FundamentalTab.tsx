@@ -90,6 +90,72 @@ export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoadin
         </div>
       )}
 
+      {/* KAP Resmi Veriler */}
+      {d.kapFinancials && (d.kapFinancials.revenue != null || d.kapFinancials.netIncome != null) && (
+        <div className="rounded-xl border border-border/40 bg-card/30 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold">KAP Resmi Veriler</span>
+            <span className="text-xs text-muted-foreground">{d.kapFinancials.period}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {d.kapFinancials.revenue != null && (
+              <div><span className="text-muted-foreground">Gelir:</span> ₺{(d.kapFinancials.revenue / 1e9).toFixed(1)}B</div>
+            )}
+            {d.kapFinancials.netIncome != null && (
+              <div><span className="text-muted-foreground">Net Kâr:</span> ₺{(d.kapFinancials.netIncome / 1e9).toFixed(1)}B</div>
+            )}
+            {d.kapFinancials.totalEquity != null && (
+              <div><span className="text-muted-foreground">Özsermaye:</span> ₺{(d.kapFinancials.totalEquity / 1e9).toFixed(1)}B</div>
+            )}
+            {d.kapFinancials.totalAssets != null && (
+              <div><span className="text-muted-foreground">Toplam Aktif:</span> ₺{(d.kapFinancials.totalAssets / 1e9).toFixed(1)}B</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Bank Metrics */}
+      {d.bankMetrics && (
+        <div className="rounded-xl border border-border/40 bg-card/30 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-semibold">🏦 Bankacılık Metrikleri</span>
+            <span className={cn("text-xs px-2 py-0.5 rounded-full",
+              d.bankMetrics.riskAssessment === "STRONG" ? "bg-green-500/10 text-green-500" :
+              d.bankMetrics.riskAssessment === "ADEQUATE" ? "bg-blue-500/10 text-blue-500" :
+              "bg-red-500/10 text-red-500"
+            )}>
+              {d.bankMetrics.riskAssessment}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {d.bankMetrics.nim != null && <div><span className="text-muted-foreground">NIM:</span> %{d.bankMetrics.nim}</div>}
+            {d.bankMetrics.costToIncome != null && <div><span className="text-muted-foreground">M/G Oranı:</span> %{d.bankMetrics.costToIncome}</div>}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">{d.bankMetrics.description}</p>
+        </div>
+      )}
+
+      {/* REIT Metrics */}
+      {d.reitMetrics && (
+        <div className="rounded-xl border border-border/40 bg-card/30 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm font-semibold">🏢 GYO Metrikleri</span>
+            <span className={cn("text-xs px-2 py-0.5 rounded-full",
+              d.reitMetrics.riskAssessment === "DISCOUNT" ? "bg-green-500/10 text-green-500" :
+              d.reitMetrics.riskAssessment === "FAIR" ? "bg-blue-500/10 text-blue-500" :
+              "bg-amber-500/10 text-amber-500"
+            )}>
+              {d.reitMetrics.riskAssessment === "DISCOUNT" ? "İskontolu" : d.reitMetrics.riskAssessment === "PREMIUM" ? "Primli" : "Adil"}
+            </span>
+          </div>
+          <div className="text-sm">
+            {d.reitMetrics.pToNav != null && <div><span className="text-muted-foreground">P/NAV:</span> {d.reitMetrics.pToNav.toFixed(2)}</div>}
+            {d.reitMetrics.navDiscount != null && <div><span className="text-muted-foreground">İskonto:</span> %{d.reitMetrics.navDiscount}</div>}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">{d.reitMetrics.description}</p>
+        </div>
+      )}
+
       {/* Macro Bar */}
       {d.macroData && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
@@ -119,6 +185,57 @@ export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoadin
               <span className="text-[9px] text-muted-foreground/40 italic">{I.interpretVIX(d.macroData.vix)}</span>
             </div>
           )}
+          {d.macroData?.tcmbPolicyRate != null && (
+            <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-border/20">
+              <div>
+                <div className="text-xs text-muted-foreground">TCMB Faizi</div>
+                <div className="text-sm font-medium">%{d.macroData.tcmbPolicyRate}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Enflasyon</div>
+                <div className="text-sm font-medium">%{d.macroData.tcmbInflation ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Reel Faiz</div>
+                <div className={cn("text-sm font-medium", (d.macroData.tcmbRealRate ?? 0) > 0 ? "text-gain" : "text-loss")}>
+                  %{d.macroData.tcmbRealRate ?? "—"}
+                </div>
+              </div>
+              {d.macroData?.tcmbReserves != null && (
+                <div className="col-span-3 pt-1">
+                  <div className="text-xs text-muted-foreground">Döviz Rezervi</div>
+                  <div className="text-sm font-medium">${d.macroData.tcmbReserves.toFixed(1)} milyar</div>
+                </div>
+              )}
+            </div>
+          )}
+          {d.economicCalendar?.volatilityWarning && d.economicCalendar.nextCritical && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2 mt-2">
+              <div className="text-xs text-amber-400 font-medium">
+                ⚠️ {d.economicCalendar.nextCritical.title} — {d.economicCalendar.daysToNextCritical} gün sonra
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Google Trends — Arama İlgisi */}
+      {d.searchInterest && d.searchInterest.currentInterest != null && (
+        <div className="rounded-xl border border-border/40 bg-card/30 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold">Arama İlgisi</span>
+            <span className={cn("text-xs px-2 py-0.5 rounded-full",
+              d.searchInterest.trend === "RISING" ? "bg-green-500/10 text-green-500" :
+              d.searchInterest.trend === "FALLING" ? "bg-red-500/10 text-red-500" :
+              "bg-gray-500/10 text-gray-500"
+            )}>
+              {d.searchInterest.trend === "RISING" ? "↑ Yükseliyor" : d.searchInterest.trend === "FALLING" ? "↓ Düşüyor" : "— Stabil"}
+            </span>
+          </div>
+          {d.searchInterest.isSpike && (
+            <div className="text-xs text-amber-400 mb-1">⚡ FOMO UYARISI — Arama ilgisi anormal yüksek</div>
+          )}
+          <p className="text-xs text-muted-foreground">{d.searchInterest.description}</p>
         </div>
       )}
 
@@ -132,6 +249,13 @@ export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoadin
               {d.sectorContext.outperforming ? "Sektörden İyi" : "Sektörden Kötü"} ({d.sectorContext.relativeStrength >= 0 ? "+" : ""}{d.sectorContext.relativeStrength.toFixed(2)}%)
             </span>
           </div>
+          {d.indexInclusion && d.indexInclusion.currentIndices.length > 0 && (
+            <div className="flex gap-1 flex-wrap mt-2">
+              {d.indexInclusion.currentIndices.map((idx: string) => (
+                <span key={idx} className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{idx}</span>
+              ))}
+            </div>
+          )}
           {/* Peer table */}
           {d.peerComparison && d.peerComparison.peers.length > 1 && (
             <div>
@@ -237,6 +361,18 @@ export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoadin
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Turkish Seasonality */}
+      {d.turkishSeasonality && (
+        <div className="text-xs text-muted-foreground mt-2">
+          <span className={cn(
+            d.turkishSeasonality.overallBias === "BULLISH" ? "text-gain" :
+            d.turkishSeasonality.overallBias === "BEARISH" ? "text-loss" : ""
+          )}>
+            Mevsimsel: {d.turkishSeasonality.description}
+          </span>
         </div>
       )}
 

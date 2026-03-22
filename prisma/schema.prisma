@@ -252,9 +252,11 @@ model AiInsight {
   date        DateTime @db.Date
   insightType String   // "akilli-ozet", "giris-cikis", "teknik-yorum", "sinyal-cozum", "risk-senaryo", "sektor-analiz", "islem-kurulumu"
   timeframe   String   @default("daily")
-  resultJson  Json
-  status      String   @default("COMPLETED")
-  createdAt   DateTime @default(now())
+  resultJson    Json
+  status        String   @default("COMPLETED")
+  promptVersion String?
+  aiProvider    String?
+  createdAt     DateTime @default(now())
 
   @@unique([stockCode, date, insightType, timeframe])
   @@index([stockCode, insightType])

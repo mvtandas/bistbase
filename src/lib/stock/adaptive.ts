@@ -39,3 +39,38 @@ export function calculateKAMA(closes: number[], erPeriod = 10, fastPeriod = 2, s
 
   return Math.round(kama * 100) / 100;
 }
+
+/**
+ * Adaptif RSI periyodu — volatiliteye göre ayarlanır
+ * Düşük volatilite → uzun periyot (21), yüksek → kısa periyot (7)
+ */
+export function getAdaptiveRSIPeriod(atrPercent: number): number {
+  if (atrPercent > 4) return 7;      // Yüksek volatilite — kısa periyot, hızlı tepki
+  if (atrPercent > 2.5) return 10;   // Orta-yüksek
+  if (atrPercent < 1) return 21;     // Çok düşük volatilite — uzun periyot
+  if (atrPercent < 1.5) return 18;   // Düşük
+  return 14;                          // Normal — standart
+}
+
+/**
+ * Adaptif Bollinger Band çarpanı — volatiliteye göre
+ * Sakin piyasa → dar bant (1.8σ), volatil → geniş bant (2.5σ)
+ */
+export function getAdaptiveBBMultiplier(atrPercent: number): number {
+  if (atrPercent > 4) return 2.5;
+  if (atrPercent > 3) return 2.2;
+  if (atrPercent < 1) return 1.6;
+  if (atrPercent < 1.5) return 1.8;
+  return 2.0;
+}
+
+/**
+ * Adaptif MA periyodu — ATR bazlı dinamik pencere
+ * Volatil piyasada daha uzun MA (gürültü filtresi)
+ */
+export function getAdaptiveMAPeriod(basePeriod: number, atrPercent: number): number {
+  if (atrPercent > 4) return Math.round(basePeriod * 1.5);
+  if (atrPercent > 3) return Math.round(basePeriod * 1.25);
+  if (atrPercent < 1) return Math.round(basePeriod * 0.75);
+  return basePeriod;
+}

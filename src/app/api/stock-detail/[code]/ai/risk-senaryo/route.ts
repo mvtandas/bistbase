@@ -5,10 +5,11 @@ import { getFundamentalData } from "@/lib/stock/fundamentals";
 import { getMacroData } from "@/lib/stock/macro";
 import { calculateRiskMetrics } from "@/lib/stock/risk";
 import { calculateSectorContext } from "@/lib/stock/sectors";
-import { generateSpecializedInsight } from "@/lib/ai/specialized";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
 import { buildRiskSenaryoPrompt } from "@/lib/ai/specialized-prompts";
-import type { RiskSenaryoOutput } from "@/lib/ai/types";
+import { RiskSenaryoSchema } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -17,22 +18,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
 }
 
-function validateRiskSenaryo(parsed: Record<string, unknown>): RiskSenaryoOutput | null {
-  if (!Array.isArray(parsed.scenarios) || parsed.scenarios.length === 0) return null;
-  if (typeof parsed.worstCaseNarrative !== "string") return null;
-  return {
-    scenarios: (parsed.scenarios as { title?: string; probability?: string; impact?: string; estimatedLoss?: string; hedgeSuggestion?: string }[]).map(s => ({
-      title: typeof s.title === "string" ? s.title : "",
-      probability: (["LOW", "MEDIUM", "HIGH"].includes(s.probability as string) ? s.probability : "MEDIUM") as "LOW" | "MEDIUM" | "HIGH",
-      impact: typeof s.impact === "string" ? s.impact : "",
-      estimatedLoss: typeof s.estimatedLoss === "string" ? s.estimatedLoss : "",
-      hedgeSuggestion: typeof s.hedgeSuggestion === "string" ? s.hedgeSuggestion : "",
-    })),
-    worstCaseNarrative: parsed.worstCaseNarrative,
-    riskAppetiteAdvice: typeof parsed.riskAppetiteAdvice === "string" ? parsed.riskAppetiteAdvice : "",
-    currentRiskSummary: typeof parsed.currentRiskSummary === "string" ? parsed.currentRiskSummary : "",
-  };
-}
 
 export async function GET(
   _request: NextRequest,
@@ -70,13 +55,13 @@ export async function GET(
       stockCode, price, riskMetrics, macroData, fundamentals: fundamentalData, sectorContext,
     });
 
-    const result = await generateSpecializedInsight(prompt.system, prompt.user, validateRiskSenaryo, { maxTokens: 1200 });
+    const result = await generateSpecializedInsightWithSchema(prompt.system, prompt.user, RiskSenaryoSchema, { maxTokens: 1200 });
 
     if (!result) {
       return NextResponse.json({ error: "AI analizi uretilemedi" }, { status: 500 });
     }
 
-    await saveInsight(stockCode, insightType, todayUTC, result as object);
+    await saveInsight(stockCode, insightType, todayUTC, result as object, "daily", { promptVersion: getPromptVersion("risk-senaryo") });
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

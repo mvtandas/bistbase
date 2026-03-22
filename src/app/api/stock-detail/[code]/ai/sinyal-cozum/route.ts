@@ -6,10 +6,12 @@ import { detectSignals } from "@/lib/stock/signals";
 import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
 import { calculateBacktest } from "@/lib/stock/backtest";
-import { generateSpecializedInsight } from "@/lib/ai/specialized";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
 import { buildSinyalCozumPrompt } from "@/lib/ai/specialized-prompts";
-import type { SinyalCozumOutput } from "@/lib/ai/types";
+import { SinyalCozumSchema } from "@/lib/ai/schemas";
+import type { SinyalCozumOutput } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -18,31 +20,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
 }
 
-function validateSinyalCozum(parsed: Record<string, unknown>): SinyalCozumOutput | null {
-  if (typeof parsed.hasConflict !== "boolean") return null;
-  if (typeof parsed.conflictSummary !== "string") return null;
-  if (typeof parsed.resolution !== "string") return null;
-  if (!parsed.dominantSignal || typeof parsed.dominantSignal !== "object") return null;
-  const ds = parsed.dominantSignal as Record<string, unknown>;
-  return {
-    hasConflict: parsed.hasConflict,
-    conflictSummary: parsed.conflictSummary,
-    resolution: parsed.resolution,
-    dominantSignal: {
-      name: typeof ds.name === "string" ? ds.name : "",
-      direction: (ds.direction === "BULLISH" || ds.direction === "BEARISH" ? ds.direction : "BULLISH") as "BULLISH" | "BEARISH",
-      whyTrust: typeof ds.whyTrust === "string" ? ds.whyTrust : "",
-    },
-    ignoredSignals: Array.isArray(parsed.ignoredSignals)
-      ? (parsed.ignoredSignals as { name?: string; whyIgnore?: string }[]).map(s => ({
-          name: typeof s.name === "string" ? s.name : "",
-          whyIgnore: typeof s.whyIgnore === "string" ? s.whyIgnore : "",
-        }))
-      : [],
-    netConclusion: typeof parsed.netConclusion === "string" ? parsed.netConclusion : "",
-    confidenceInResolution: (["HIGH", "MEDIUM", "LOW"].includes(parsed.confidenceInResolution as string) ? parsed.confidenceInResolution : "MEDIUM") as "HIGH" | "MEDIUM" | "LOW",
-  };
-}
 
 export async function GET(
   _request: NextRequest,
@@ -96,13 +73,13 @@ export async function GET(
       stockCode, price, signals, signalBacktest, multiTimeframe, signalCombination,
     });
 
-    const result = await generateSpecializedInsight(prompt.system, prompt.user, validateSinyalCozum);
+    const result = await generateSpecializedInsightWithSchema(prompt.system, prompt.user, SinyalCozumSchema);
 
     if (!result) {
       return NextResponse.json({ error: "AI analizi uretilemedi" }, { status: 500 });
     }
 
-    await saveInsight(stockCode, insightType, todayUTC, result as object);
+    await saveInsight(stockCode, insightType, todayUTC, result as object, "daily", { promptVersion: getPromptVersion("sinyal-cozum") });
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

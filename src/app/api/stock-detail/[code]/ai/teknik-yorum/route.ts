@@ -8,10 +8,11 @@ import { detectChartPatterns } from "@/lib/stock/chart-patterns";
 import { detectSignalChains } from "@/lib/stock/signal-chains";
 import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
-import { generateSpecializedInsight } from "@/lib/ai/specialized";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
 import { buildTeknikYorumPrompt } from "@/lib/ai/specialized-prompts";
-import type { TeknikYorumOutput } from "@/lib/ai/types";
+import { TeknikYorumSchema } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -20,25 +21,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
 }
 
-function validateTeknikYorum(parsed: Record<string, unknown>): TeknikYorumOutput | null {
-  if (typeof parsed.patternNarrative !== "string") return null;
-  if (typeof parsed.historicalContext !== "string") return null;
-  if (typeof parsed.confluenceAnalysis !== "string") return null;
-  if (!parsed.keyLevel || typeof parsed.keyLevel !== "object") return null;
-  const kl = parsed.keyLevel as Record<string, unknown>;
-  return {
-    patternNarrative: parsed.patternNarrative,
-    historicalContext: parsed.historicalContext,
-    confluenceAnalysis: parsed.confluenceAnalysis,
-    keyLevel: {
-      price: typeof kl.price === "number" ? kl.price : 0,
-      type: typeof kl.type === "string" ? kl.type : "support",
-      significance: typeof kl.significance === "string" ? kl.significance : "",
-    },
-    patternReliability: (["HIGH", "MEDIUM", "LOW"].includes(parsed.patternReliability as string) ? parsed.patternReliability : "MEDIUM") as "HIGH" | "MEDIUM" | "LOW",
-    actionableInsight: typeof parsed.actionableInsight === "string" ? parsed.actionableInsight : "",
-  };
-}
 
 export async function GET(
   _request: NextRequest,
@@ -80,13 +62,13 @@ export async function GET(
       technicals, signalChains, signalCombination, multiTimeframe,
     });
 
-    const result = await generateSpecializedInsight(prompt.system, prompt.user, validateTeknikYorum, { maxTokens: 1200 });
+    const result = await generateSpecializedInsightWithSchema(prompt.system, prompt.user, TeknikYorumSchema, { maxTokens: 1200 });
 
     if (!result) {
       return NextResponse.json({ error: "AI analizi uretilemedi" }, { status: 500 });
     }
 
-    await saveInsight(stockCode, insightType, todayUTC, result as object);
+    await saveInsight(stockCode, insightType, todayUTC, result as object, "daily", { promptVersion: getPromptVersion("teknik-yorum") });
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

@@ -136,6 +136,107 @@ export function detectChartPatterns(bars: HistoricalBar[]): ChartPattern[] {
     }
   }
 
+  // ── Simetrik Üçgen ──
+  if (highs.length >= 2 && lows.length >= 2) {
+    const recentHighs = highs.slice(-3);
+    const recentLows = lows.slice(-3);
+    const highFalling = recentHighs.length >= 2 && recentHighs[recentHighs.length - 1].price < recentHighs[recentHighs.length - 2].price;
+    const lowRising = recentLows.length >= 2 && recentLows[recentLows.length - 1].price > recentLows[recentLows.length - 2].price;
+
+    if (highFalling && lowRising) {
+      // Daralan range kontrolü
+      const range1 = recentHighs[recentHighs.length - 2].price - recentLows[recentLows.length - 2].price;
+      const range2 = recentHighs[recentHighs.length - 1].price - recentLows[recentLows.length - 1].price;
+      if (range2 < range1 * 0.8) {
+        patterns.push({
+          name: "SYMMETRICAL_TRIANGLE", nameTr: "Simetrik Üçgen", type: "CONTINUATION", direction: price > (recentHighs[recentHighs.length - 1].price + recentLows[recentLows.length - 1].price) / 2 ? "BULLISH" : "BEARISH", strength: 65,
+          description: "Simetrik üçgen: Düşen direnç + yükselen destek. Daralan range, kırılım yakın. Kırılım yönü trendin devamı olasılığı yüksek.",
+        });
+      }
+    }
+  }
+
+  // ── Bayrak (Flag) — Devam formasyonu ──
+  // Keskin hareket sonrası kısa konsolidasyon
+  if (bars.length >= 30) {
+    const recent20 = bars.slice(-20);
+    const prior10 = bars.slice(-30, -20);
+
+    // Önceki 10 barda güçlü hareket (>%8)
+    const priorMove = (prior10[prior10.length - 1].close - prior10[0].close) / prior10[0].close;
+    const recentRange = Math.max(...recent20.map(b => b.high)) - Math.min(...recent20.map(b => b.low));
+    const priorRange = Math.max(...prior10.map(b => b.high)) - Math.min(...prior10.map(b => b.low));
+
+    if (Math.abs(priorMove) > 0.08 && recentRange < priorRange * 0.5) {
+      const isBullFlag = priorMove > 0;
+      patterns.push({
+        name: isBullFlag ? "BULL_FLAG" : "BEAR_FLAG",
+        nameTr: isBullFlag ? "Boğa Bayrağı" : "Ayı Bayrağı",
+        type: "CONTINUATION",
+        direction: isBullFlag ? "BULLISH" : "BEARISH",
+        strength: 70,
+        description: `${isBullFlag ? "Boğa" : "Ayı"} bayrağı: Güçlü %${Math.abs(priorMove * 100).toFixed(0)} ${isBullFlag ? "yükseliş" : "düşüş"} sonrası dar konsolidasyon. Trend devamı olasılığı yüksek.`,
+      });
+    }
+  }
+
+  // ── Kama (Wedge) ──
+  // Rising wedge (bearish) veya Falling wedge (bullish)
+  if (highs.length >= 3 && lows.length >= 3) {
+    const h3 = highs.slice(-3);
+    const l3 = lows.slice(-3);
+
+    const highsRising = h3[2].price > h3[1].price && h3[1].price > h3[0].price;
+    const lowsRising = l3[2].price > l3[1].price && l3[1].price > l3[0].price;
+    const highsFalling = h3[2].price < h3[1].price && h3[1].price < h3[0].price;
+    const lowsFalling = l3[2].price < l3[1].price && l3[1].price < l3[0].price;
+
+    // Daralan range (kama özelliği)
+    const range0 = h3[0].price - l3[0].price;
+    const range2 = h3[2].price - l3[2].price;
+    const converging = range2 < range0 * 0.85;
+
+    if (highsRising && lowsRising && converging) {
+      patterns.push({
+        name: "RISING_WEDGE", nameTr: "Yükselen Kama", type: "REVERSAL", direction: "BEARISH", strength: 72,
+        description: "Yükselen kama: Hem tepeler hem dipler yükseliyor ama daralan range. Aşağı kırılım olasılığı yüksek.",
+      });
+    }
+    if (highsFalling && lowsFalling && converging) {
+      patterns.push({
+        name: "FALLING_WEDGE", nameTr: "Düşen Kama", type: "REVERSAL", direction: "BULLISH", strength: 72,
+        description: "Düşen kama: Hem tepeler hem dipler düşüyor ama daralan range. Yukarı kırılım olasılığı yüksek.",
+      });
+    }
+  }
+
+  // ── Fincan-Kulp (Cup & Handle) — Devam formasyonu ──
+  if (bars.length >= 60 && lows.length >= 3 && highs.length >= 2) {
+    // Sol kenar (önceki yüksek), dip ve sağ kenar (güncel yüksek)
+    const leftRim = highs.find(h => h.index < bars.length - 40 && h.index > bars.length - 60);
+    const cupBottom = lows.filter(l => l.index > (leftRim?.index ?? 0) && l.index < bars.length - 10);
+    const rightRim = highs.filter(h => h.index > bars.length - 15);
+
+    if (leftRim && cupBottom.length > 0 && rightRim.length > 0) {
+      const deepest = cupBottom.reduce((a, b) => a.price < b.price ? a : b);
+      const rightTop = rightRim[rightRim.length - 1];
+      const rimMatch = Math.abs(leftRim.price - rightTop.price) / leftRim.price < 0.05;
+      const cupDepth = (leftRim.price - deepest.price) / leftRim.price;
+
+      if (rimMatch && cupDepth > 0.10 && cupDepth < 0.40) {
+        // Handle: son 10 barda hafif geri çekilme
+        const handleBars = bars.slice(-10);
+        const handleDip = (rightTop.price - Math.min(...handleBars.map(b => b.low))) / rightTop.price;
+        if (handleDip > 0.02 && handleDip < 0.10) {
+          patterns.push({
+            name: "CUP_AND_HANDLE", nameTr: "Fincan-Kulp", type: "CONTINUATION", direction: "BULLISH", strength: 80,
+            description: `Fincan-Kulp: ₺${leftRim.price.toFixed(2)} kenar, %${(cupDepth * 100).toFixed(0)} derinlik, kulp oluşuyor. Kırılımda güçlü yükseliş potansiyeli.`,
+          });
+        }
+      }
+    }
+  }
+
   patterns.sort((a, b) => b.strength - a.strength);
   return patterns;
 }

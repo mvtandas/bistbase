@@ -8,10 +8,12 @@ import { getFundamentalData, scoreFundamentals } from "@/lib/stock/fundamentals"
 import { getMacroData } from "@/lib/stock/macro";
 import { calculateRiskMetrics } from "@/lib/stock/risk";
 import { analyzeSeasonality } from "@/lib/stock/seasonality";
-import { generateSpecializedInsight } from "@/lib/ai/specialized";
+import { getInsiderSummary } from "@/lib/stock/insider-tracking";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
 import { buildAkilliOzetPrompt } from "@/lib/ai/specialized-prompts";
-import type { AkilliOzetOutput } from "@/lib/ai/types";
+import { AkilliOzetSchema } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -20,27 +22,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
 }
 
-function validateAkilliOzet(parsed: Record<string, unknown>): AkilliOzetOutput | null {
-  if (typeof parsed.tldr !== "string") return null;
-  if (!Array.isArray(parsed.bullets)) return null;
-  if (!parsed.timeHorizon || typeof parsed.timeHorizon !== "object") return null;
-  if (!Array.isArray(parsed.watchlist)) return null;
-  const th = parsed.timeHorizon as Record<string, unknown>;
-  return {
-    tldr: parsed.tldr,
-    bullets: (parsed.bullets as { icon?: string; text?: string; category?: string }[]).map(b => ({
-      icon: typeof b.icon === "string" ? b.icon : "🟡",
-      text: typeof b.text === "string" ? b.text : "",
-      category: (["technical", "fundamental", "macro", "risk"].includes(b.category as string) ? b.category : "technical") as "technical" | "fundamental" | "macro" | "risk",
-    })),
-    timeHorizon: {
-      shortTerm: typeof th.shortTerm === "string" ? th.shortTerm : "",
-      mediumTerm: typeof th.mediumTerm === "string" ? th.mediumTerm : "",
-      longTerm: typeof th.longTerm === "string" ? th.longTerm : "",
-    },
-    watchlist: (parsed.watchlist as unknown[]).filter((w): w is string => typeof w === "string"),
-  };
-}
 
 export async function GET(
   _request: NextRequest,
@@ -82,6 +63,9 @@ export async function GET(
     const riskMetrics = safe(() => bars.length > 10 ? calculateRiskMetrics(bars, fundamentalData?.beta ?? null) : null, null);
     const seasonality = safe(() => bars.length > 12 ? analyzeSeasonality(bars) : null, null);
 
+    // Fetch insider data
+    const insiderSummary = await getInsiderSummary(stockCode).catch(() => null);
+
     // Generate AI
     const prompt = buildAkilliOzetPrompt({
       stockCode, price, changePercent,
@@ -89,8 +73,14 @@ export async function GET(
       macroData, seasonality, fundamentalScore: fundScore,
     });
 
+    // Append insider info to user prompt
+    if (insiderSummary && (insiderSummary.recentBuys > 0 || insiderSummary.recentSells > 0)) {
+      const dirLabel = insiderSummary.netDirection === "NET_BUY" ? "NET ALIM" : insiderSummary.netDirection === "NET_SELL" ? "NET SATIM" : "NÖTR";
+      prompt.user += `\n\nİÇ SAHIP İŞLEMLERİ (Son 30 gün): ${insiderSummary.recentBuys} alım, ${insiderSummary.recentSells} satım → ${dirLabel} (sinyal gücü: ${insiderSummary.signalStrength}/10)`;
+    }
+
     console.log(`[akilli-ozet] Generating for ${stockCode}, prompt length: system=${prompt.system.length}, user=${prompt.user.length}`);
-    const result = await generateSpecializedInsight(prompt.system, prompt.user, validateAkilliOzet);
+    const result = await generateSpecializedInsightWithSchema(prompt.system, prompt.user, AkilliOzetSchema);
 
     if (!result) {
       console.error(`[akilli-ozet] AI returned null for ${stockCode}`);
@@ -98,7 +88,7 @@ export async function GET(
     }
 
     // Save cache (DB + Redis)
-    await saveInsight(stockCode, insightType, todayUTC, result as object);
+    await saveInsight(stockCode, insightType, todayUTC, result as object, "daily", { promptVersion: getPromptVersion("akilli-ozet") });
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

@@ -20,6 +20,14 @@ import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
 import { computeChartOverlays } from "@/lib/stock/chart-overlays";
 import { calculateBacktest } from "@/lib/stock/backtest";
 import { prisma } from "@/lib/prisma";
+import { calculateVolatilityRegime } from "@/lib/stock/volatility-regime";
+import { calculateTurkishSeasonality } from "@/lib/stock/turkish-seasonality";
+import { getIndexInclusionData } from "@/lib/stock/index-inclusion";
+import { getBankMetrics } from "@/lib/stock/bank-metrics";
+import { getREITMetrics } from "@/lib/stock/reit-metrics";
+import { getUpcomingEvents } from "@/lib/data/economic-calendar";
+import { getSearchInterest } from "@/lib/stock/search-interest";
+import { getKAPFinancials } from "@/lib/data/kap";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({
@@ -39,12 +47,13 @@ export async function GET(
 
   try {
     // 1. Fetch everything in parallel — each source independently caught
-    const [quote, bars, fundamentalData, macroData, peerData] = await Promise.all([
+    const [quote, bars, fundamentalData, macroData, peerData, kapFinancials] = await Promise.all([
       yf.quote(`${stockCode}.IS`).catch(() => null),
       getHistoricalBars(stockCode, 220).catch(() => []),
       getFundamentalData(stockCode).catch(() => null),
       getMacroData().catch(() => null),
       getPeerComparison(stockCode).catch(() => null),
+      getKAPFinancials(stockCode).catch(() => null),
     ]);
 
     const price = quote?.regularMarketPrice ?? null;
@@ -67,11 +76,6 @@ export async function GET(
       null
     );
 
-    const score = safe(
-      () => technicals && price ? calculateCompositeScore(technicals, price, 0, fundScore, macroData) : null,
-      null
-    );
-
     const sectorContext = changePercent != null
       ? await calculateSectorContext(stockCode, changePercent).catch(() => null)
       : null;
@@ -90,6 +94,25 @@ export async function GET(
     );
     const signalCombination = safe(() => analyzeSignalCombinations(signals), null);
     const seasonality = safe(() => bars.length > 60 ? analyzeSeasonality(bars) : null, null);
+
+    // Yeni modüller (score'dan ÖNCE hesaplanmalı — score'a girdi olarak kullanılıyor)
+    const volatilityRegime = safe(() => calculateVolatilityRegime(bars), null);
+    const turkishSeasonality = safe(() => calculateTurkishSeasonality(), null);
+    const bankMetrics = safe(() => getBankMetrics(stockCode, fundamentalData), null);
+    const reitMetrics = safe(() => getREITMetrics(stockCode, fundamentalData), null);
+    const economicCalendar = safe(() => getUpcomingEvents(14), null);
+    const indexInclusion = await getIndexInclusionData(stockCode).catch(() => null);
+    const searchInterest = await getSearchInterest(stockCode).catch(() => null);
+
+    // Composite score — yeni modüllerle zenginleştirilmiş
+    const score = safe(
+      () => technicals && price ? calculateCompositeScore(technicals, price, 0, fundScore, macroData, null, "daily", {
+        volatilityRegime,
+        turkishSeasonality,
+        indexInclusion,
+      }) : null,
+      null
+    );
 
     // 3b. Signal calibration — apply accuracy to signal strengths
     let accuracyMap: Awaited<ReturnType<typeof getSignalAccuracyMap>> | null = null;
@@ -204,6 +227,10 @@ export async function GET(
       vix: macroData.vix ?? null,
       macroScore: macroData.macroScore ?? 50,
       macroLabel: macroData.macroLabel ?? "Veri Yok",
+      tcmbPolicyRate: macroData.tcmbPolicyRate ?? null,
+      tcmbInflation: macroData.tcmbInflation ?? null,
+      tcmbRealRate: macroData.tcmbRealRate ?? null,
+      tcmbReserves: macroData.tcmbReserves ?? null,
     } : null;
 
     return NextResponse.json({
@@ -238,6 +265,14 @@ export async function GET(
           : null,
       },
       peerComparison: peerData,
+      volatilityRegime,
+      turkishSeasonality,
+      indexInclusion,
+      bankMetrics: bankMetrics?.isBankStock ? bankMetrics : null,
+      reitMetrics: reitMetrics?.isREIT ? reitMetrics : null,
+      economicCalendar,
+      searchInterest,
+      kapFinancials,
       priceHistory,
       chartBars,
       chartOverlays,

@@ -38,6 +38,9 @@ export interface StockAnalysisInputV2 {
 }
 
 export interface StockAnalysisOutputV2 {
+  reasoning?: string;
+  counterArgument?: string;
+  dataQualityNote?: string;
   summaryText: string;
   bullCase: string;
   bearCase: string;

@@ -99,6 +99,12 @@ export interface VerdictInput {
   riskMetrics: { var95Daily: number | null; currentDrawdown: number | null; riskLevel: string | null; liquidityScore: number | null; stressTests: { estimatedLoss: number }[] } | null;
   sentimentValue?: number | null;
   signalBacktest?: { performances: { signalType: string; horizon1D: { winRate: number; profitFactor: number; sampleSize: number }; bestHorizon: string; confidenceScore: number; streaks: { maxConsecutiveLosses: number } }[] } | null;
+  // Yeni modül verileri
+  insiderSummary?: { netDirection: "NET_BUY" | "NET_SELL" | "NEUTRAL"; signalStrength: number } | null;
+  bankMetrics?: { riskAssessment: "STRONG" | "ADEQUATE" | "WEAK" | null } | null;
+  reitMetrics?: { riskAssessment: "DISCOUNT" | "FAIR" | "PREMIUM" | null } | null;
+  economicCalendar?: { volatilityWarning: boolean; daysToNextCritical: number | null; nextCritical: { title: string } | null } | null;
+  volatilityRegime?: { regime: string; volExpanding: boolean; regimeShiftSignal: string | null } | null;
 }
 
 // ═══════════════════════════════════════
@@ -177,7 +183,10 @@ function castMAVotes(t: Record<string, unknown>, extra: VerdictInput["extraIndic
   // 10: Parabolic SAR
   vote(extra?.sarTrend != null ? extra.sarTrend === "BULLISH" : null);
 
-  // 11: BB Middle (bbMiddle = ma20 zaten ama BB'nin orta bandı olarak)
+  // 11: Supertrend (trend following — Matriks'te en popüler indikatör)
+  vote(extra?.supertrendDirection != null ? extra.supertrendDirection === "BULLISH" : null);
+
+  // 12: BB Middle (bbMiddle = ma20 zaten ama BB'nin orta bandı olarak)
   const bbMiddle = num(t.bbMiddle) ?? num(t.ma20);
   vote(bbMiddle != null ? price > bbMiddle : null);
 
@@ -187,8 +196,7 @@ function castMAVotes(t: Record<string, unknown>, extra: VerdictInput["extraIndic
 function castOscillatorVotes(t: Record<string, unknown>, extra: VerdictInput["extraIndicators"]): VoteGroup {
   let buy = 0, sell = 0, neutral = 0;
 
-  // 1: RSI + Stochastic (tek grup — korelasyon ~0.7-0.8, çift sayımı önle)
-  // İkisinin ortalamasını alıp 1 oy olarak say
+  // 1-2: RSI + Stochastic (ayrı değerlendir — diverjans tespiti için)
   const rsi = num(t.rsi14);
   const rsiBullDiv = bool(t.rsiBullishDivergence);
   const rsiBearDiv = bool(t.rsiBearishDivergence);
@@ -206,11 +214,27 @@ function castOscillatorVotes(t: Record<string, unknown>, extra: VerdictInput["ex
       if (stochK < 20) stochVote = 1;
       else if (stochK > 80) stochVote = -1;
     }
-    // Ortalama oy (ikisi uyumluysa güçlü, çelişiyorsa nötr)
-    const combined = rsiVote + stochVote;
-    if (combined > 0) buy++;
-    else if (combined < 0) sell++;
-    else neutral++;
+
+    // Diverjans tespiti: RSI ve Stochastic zıt yönlerde → diverjans sinyali
+    // Diverjans piyasa dönüşü öncesinde ortaya çıkar, nötr yerine bilgi taşır
+    if (rsiVote !== 0 && stochVote !== 0 && rsiVote !== stochVote) {
+      // RSI daha güvenilir diverjans göstergesi — RSI yönüne ağırlık ver
+      if (rsiVote > 0) buy++;
+      else sell++;
+      // Ama diverjans = düşük güven, ikinci oy nötr
+      neutral++;
+    } else {
+      // Uyumlu veya tek veri — eski mantık
+      const combined = rsiVote + stochVote;
+      if (combined > 0) buy++;
+      else if (combined < 0) sell++;
+      else neutral++;
+      // Güçlü uyum bonusu: ikisi de aynı yönde
+      if (rsiVote !== 0 && stochVote !== 0 && rsiVote === stochVote) {
+        if (rsiVote > 0) buy++;
+        else sell++;
+      }
+    }
   }
 
   // 3: MACD Histogram
@@ -327,7 +351,11 @@ function scoreToRating(score: number): number {
   return -1;
 }
 
-function calculateFundamentalPillar(fs: VerdictInput["fundamentalScore"]): FundamentalPillar {
+function calculateFundamentalPillar(
+  fs: VerdictInput["fundamentalScore"],
+  bankMetrics?: VerdictInput["bankMetrics"],
+  reitMetrics?: VerdictInput["reitMetrics"],
+): FundamentalPillar {
   if (!fs) return { rating: 0, valuationRating: 0, qualityRating: 0, growthRating: 0 };
 
   const valuationRating = scoreToRating(fs.valuationScore);
@@ -335,7 +363,17 @@ function calculateFundamentalPillar(fs: VerdictInput["fundamentalScore"]): Funda
   const qualityRating = scoreToRating(qualityScore);
   const growthRating = scoreToRating(fs.growthScore);
 
-  const rating = valuationRating * 0.35 + qualityRating * 0.35 + growthRating * 0.30;
+  let rating = valuationRating * 0.35 + qualityRating * 0.35 + growthRating * 0.30;
+
+  // B2: Sektöre özel metrik ayarlaması
+  if (bankMetrics?.riskAssessment) {
+    if (bankMetrics.riskAssessment === "STRONG") rating += 0.15;
+    else if (bankMetrics.riskAssessment === "WEAK") rating -= 0.15;
+  }
+  if (reitMetrics?.riskAssessment) {
+    if (reitMetrics.riskAssessment === "DISCOUNT") rating += 0.20;
+    else if (reitMetrics.riskAssessment === "PREMIUM") rating -= 0.10;
+  }
 
   return { rating: clamp(rating, -1, 1), valuationRating, qualityRating, growthRating };
 }
@@ -387,7 +425,14 @@ function calculateFlowPillar(input: VerdictInput): FlowPillar {
     else if (liq < 30) liquidityPenalty = 0.5;
   }
 
-  const rawRating = signalRating * 0.40 + volumeRating * 0.20 + macroRating * 0.15 + mtfRating * 0.25;
+  // B1: Insider işlemleri → signal rating'e ek boost
+  let insiderBoost = 0;
+  if (input.insiderSummary && input.insiderSummary.signalStrength >= 5) {
+    if (input.insiderSummary.netDirection === "NET_BUY") insiderBoost = 0.15;
+    else if (input.insiderSummary.netDirection === "NET_SELL") insiderBoost = -0.15;
+  }
+
+  const rawRating = signalRating * 0.40 + volumeRating * 0.20 + macroRating * 0.15 + mtfRating * 0.25 + insiderBoost;
   const rating = rawRating * liquidityPenalty;
 
   return { rating: clamp(rating, -1, 1), signalRating, volumeRating, macroRating, mtfRating };
@@ -406,9 +451,26 @@ const REGIME_PILLAR_WEIGHTS: Record<VolatilityRegime, PillarWeights> = {
   CRISIS: { technical: 0.30, fundamental: 0.15, flow: 0.55 },
 };
 
-function getPillarWeights(macroData: VerdictInput["macroData"], hasFundamentals: boolean): PillarWeights {
-  const regime = detectVolatilityRegime(macroData as Parameters<typeof detectVolatilityRegime>[0]);
+function getPillarWeights(
+  macroData: VerdictInput["macroData"],
+  hasFundamentals: boolean,
+  volatilityRegime?: VerdictInput["volatilityRegime"],
+): PillarWeights {
+  let regime = detectVolatilityRegime(macroData as Parameters<typeof detectVolatilityRegime>[0]);
+
+  // B4: EWMA vol rejimi override — daha sofistike rejim tespiti
+  if (volatilityRegime) {
+    if (volatilityRegime.regime === "EXTREME" && regime !== "CRISIS") regime = "CRISIS";
+    else if (volatilityRegime.regime === "HIGH" && regime === "NORMAL") regime = "HIGH";
+  }
+
   const w = { ...REGIME_PILLAR_WEIGHTS[regime] };
+
+  // EWMA vol genişliyorsa momentum/flow daha önemli
+  if (volatilityRegime?.volExpanding) {
+    w.flow += 0.05;
+    w.fundamental -= 0.05;
+  }
 
   // Temel veri yoksa ağırlığını diğerlerine dağıt
   if (!hasFundamentals) {
@@ -444,9 +506,15 @@ function applyRiskAdjustment(rawScore: number, risk: VerdictInput["riskMetrics"]
 
   penalty = Math.min(penalty, 0.35);
 
-  // Simetrik risk ayarlaması — her iki yöne eşit penalty
-  if (rawScore > 0) return rawScore * (1 - penalty);
-  return rawScore * (1 + penalty);
+  // Asimetrik risk ayarlaması:
+  // Boğa sinyalinde (score > 0) yüksek risk → daha sert ceza (risk sinyale çelişiyor)
+  // Ayı sinyalinde (score < 0) yüksek risk → daha hafif ceza (risk sinyali doğruluyor)
+  if (rawScore > 0) {
+    // Boğa + yüksek risk = çelişki → %50 daha fazla ceza
+    return rawScore * (1 - penalty * 1.5);
+  }
+  // Ayı + yüksek risk = uyum → standart ceza (risk zaten SAT yönünde)
+  return rawScore * (1 + penalty * 0.7);
 }
 
 // ═══════════════════════════════════════
@@ -474,14 +542,14 @@ function calculateConfidence(
 ): number {
   let conf = 50;
 
-  // A. Inter-pillar agreement
+  // A. Inter-pillar agreement (güçlendirilmiş çatışma cezası)
   const signs = [sign(tech.rating), sign(fund.rating), sign(flow.rating)];
   const nonZero = signs.filter(s => s !== 0);
   if (nonZero.length >= 3 && new Set(nonZero).size === 1) conf += 25;
   else if (nonZero.length >= 2) {
     const counts = { pos: nonZero.filter(s => s > 0).length, neg: nonZero.filter(s => s < 0).length };
     if (counts.pos >= 2 || counts.neg >= 2) conf += 10;
-    else conf -= 15;
+    else conf -= 20; // çatışma: daha sert ceza (eskisi: -15)
   } else {
     conf -= 5; // insufficient data
   }
@@ -498,7 +566,7 @@ function calculateConfidence(
   if (input.signalBacktest?.performances?.length) {
     const activePerfs = input.signals
       .map(s => input.signalBacktest!.performances.find(p => p.signalType === s.type))
-      .filter((p): p is NonNullable<typeof p> => p != null && p.horizon1D.sampleSize >= 3);
+      .filter((p): p is NonNullable<typeof p> => p != null && p.horizon1D.sampleSize >= 5); // min 5 (eskisi: 3)
 
     if (activePerfs.length > 0) {
       const avgWinRate = activePerfs.reduce((sum, p) => sum + p.horizon1D.winRate, 0) / activePerfs.length;
@@ -506,21 +574,29 @@ function calculateConfidence(
       const avgSample = activePerfs.reduce((sum, p) => sum + p.horizon1D.sampleSize, 0) / activePerfs.length;
       const maxLossStreak = Math.max(...activePerfs.map(p => p.streaks.maxConsecutiveLosses));
 
-      if (avgWinRate >= 70 && avgPF >= 2.0) conf += 15;
-      else if (avgWinRate >= 60 && avgPF >= 1.5) conf += 10;
-      else if (avgWinRate >= 55) conf += 5;
-      else if (avgWinRate < 45) conf -= 8;
-      else if (avgWinRate < 35) conf -= 15;
+      // Kombine skor: WR + PF birlikte değerlendir
+      // PF 2.0 olan %60 WR > PF 1.1 olan %65 WR
+      const qualityScore = avgWinRate * 0.4 + Math.min(avgPF * 20, 60) * 0.6;
+      if (qualityScore >= 50 && avgPF >= 2.0) conf += 15;
+      else if (qualityScore >= 40 && avgPF >= 1.5) conf += 10;
+      else if (qualityScore >= 30) conf += 5;
+      else if (avgWinRate < 45 && avgPF < 1.0) conf -= 12;
+      else if (avgWinRate < 40) conf -= 8;
 
-      if (avgSample >= 15) conf += 5;
-      if (maxLossStreak >= 5) conf -= 5;
+      // Örneklem büyüklüğü bonusu — kademeli
+      if (avgSample >= 20) conf += 7;
+      else if (avgSample >= 10) conf += 5;
+      else if (avgSample < 7) conf -= 3; // az veriyle güvenme
+
+      if (maxLossStreak >= 7) conf -= 8;
+      else if (maxLossStreak >= 5) conf -= 5;
     }
   } else {
     // Fallback: basit accuracy
     const accValues: number[] = [];
     for (const s of input.signals) {
       const acc = input.signalAccuracy[s.type];
-      if (acc && acc.count >= 3) accValues.push(acc.rate);
+      if (acc && acc.count >= 5) accValues.push(acc.rate); // min 5 (eskisi: 3)
     }
     if (accValues.length > 0) {
       const avgAcc = accValues.reduce((a, b) => a + b, 0) / accValues.length;
@@ -534,7 +610,7 @@ function calculateConfidence(
     const al = input.multiTimeframe.alignment;
     if (al === "STRONG_ALIGNED") conf += 10;
     else if (al === "ALIGNED") conf += 5;
-    else if (al === "CONFLICTING") conf -= 10;
+    else if (al === "CONFLICTING") conf -= 15; // güçlendirilmiş (eskisi: -10)
     else conf -= 3;
   } else { conf -= 5; }
 
@@ -555,6 +631,14 @@ function calculateConfidence(
   if (!input.multiTimeframe) conf -= 5;
   if (!input.macroData) conf -= 3;
   if (!input.extraIndicators) conf -= 3;
+
+  // H. Ekonomik takvim — yaklaşan kritik event confidence düşürür (B3)
+  if (input.economicCalendar?.volatilityWarning && input.economicCalendar.daysToNextCritical != null) {
+    if (input.economicCalendar.daysToNextCritical <= 1) conf -= 12;
+    else if (input.economicCalendar.daysToNextCritical <= 3) conf -= 7;
+  } else if (input.economicCalendar?.nextCritical) {
+    conf -= 3; // kritik event var ama uzak
+  }
 
   return clamp(conf, 5, 95);
 }
@@ -618,7 +702,30 @@ function generateReasons(
     else if (fs < 35) reasons.push(`Temel analiz zayıf (${fs}/100)`);
   }
 
-  return reasons.slice(0, 4);
+  // Yeni modül faktörleri — kullanıcıya şeffaflık
+  if (input.insiderSummary) {
+    if (input.insiderSummary.netDirection === "NET_BUY" && input.insiderSummary.signalStrength >= 5)
+      reasons.push("İçeriden alım sinyali: Son 30 günde net yönetici alımı");
+    else if (input.insiderSummary.netDirection === "NET_SELL" && input.insiderSummary.signalStrength >= 5)
+      reasons.push("İçeriden satış uyarısı: Son 30 günde net yönetici satışı");
+  }
+
+  if (input.economicCalendar?.volatilityWarning && input.economicCalendar.nextCritical) {
+    const days = input.economicCalendar.daysToNextCritical;
+    reasons.push(`${input.economicCalendar.nextCritical.title} ${days != null ? `${days} gün sonra` : "yaklaşıyor"} — volatilite artabilir`);
+  }
+
+  if (input.bankMetrics?.riskAssessment === "STRONG")
+    reasons.push("Bankacılık metrikleri güçlü");
+  else if (input.bankMetrics?.riskAssessment === "WEAK")
+    reasons.push("Bankacılık metrikleri zayıf");
+
+  if (input.reitMetrics?.riskAssessment === "DISCOUNT")
+    reasons.push("GYO iskontolu işlem görüyor (cazip)");
+  else if (input.reitMetrics?.riskAssessment === "PREMIUM")
+    reasons.push("GYO primli işlem görüyor (pahalı)");
+
+  return reasons.slice(0, 6);
 }
 
 function findStrongestSignal(
@@ -659,11 +766,11 @@ function generateRiskNote(risk: VerdictInput["riskMetrics"]): string {
 export function calculateVerdict(input: VerdictInput): Verdict {
   // 1. Three pillars
   const technical = calculateTechnicalPillar(input.technicals, input.extraIndicators, input.price);
-  const fundamental = calculateFundamentalPillar(input.fundamentalScore);
+  const fundamental = calculateFundamentalPillar(input.fundamentalScore, input.bankMetrics, input.reitMetrics);
   const flow = calculateFlowPillar(input);
 
-  // 2. Dynamic weights
-  const weights = getPillarWeights(input.macroData, !!input.fundamentalScore);
+  // 2. Dynamic weights (EWMA vol rejimi ile zenginleştirilmiş)
+  const weights = getPillarWeights(input.macroData, !!input.fundamentalScore, input.volatilityRegime);
 
   // 3. Raw score
   const rawScore = technical.rating * weights.technical

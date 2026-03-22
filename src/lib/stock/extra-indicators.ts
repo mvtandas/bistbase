@@ -6,6 +6,11 @@
 import type { HistoricalBar } from "./technicals";
 import { calculateKAMA } from "./adaptive";
 
+export interface PivotPoints {
+  classic: { pp: number; s1: number; s2: number; s3: number; r1: number; r2: number; r3: number };
+  fibonacci: { pp: number; s1: number; s2: number; s3: number; r1: number; r2: number; r3: number };
+}
+
 export interface ExtraIndicators {
   vwap: number | null;
   priceVsVwap: "ABOVE" | "BELOW" | null;
@@ -20,6 +25,11 @@ export interface ExtraIndicators {
   elderBearPower: number | null;
   kama: number | null;
   priceVsKama: "ABOVE" | "BELOW" | null;
+  // Yeni indikatörler
+  supertrend: number | null;
+  supertrendDirection: "BULLISH" | "BEARISH" | null;
+  pivotPoints: PivotPoints | null;
+  nearestPivot: { level: string; price: number; distance: number } | null;
 }
 
 // ── VWAP (cumulative) ──
@@ -131,6 +141,120 @@ function calcElderRay(bars: HistoricalBar[]): { bull: number; bear: number } | n
   };
 }
 
+// ── Supertrend (ATR-based, period=10, multiplier=3) ──
+function calcSupertrend(bars: HistoricalBar[], period = 10, multiplier = 3): { value: number; direction: "BULLISH" | "BEARISH" } | null {
+  if (bars.length < period + 1) return null;
+
+  // ATR hesapla
+  const trs: number[] = [];
+  for (let i = 1; i < bars.length; i++) {
+    trs.push(Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - bars[i - 1].close),
+      Math.abs(bars[i].low - bars[i - 1].close)
+    ));
+  }
+
+  // ATR SMA başlangıç
+  let atr = 0;
+  for (let i = 0; i < period; i++) atr += trs[i];
+  atr /= period;
+
+  let upperBand = 0, lowerBand = 0;
+  let prevUpperBand = 0, prevLowerBand = 0;
+  let supertrend = 0;
+  let direction: "BULLISH" | "BEARISH" = "BULLISH";
+
+  for (let i = period; i < trs.length; i++) {
+    // Wilder ATR
+    atr = (atr * (period - 1) + trs[i]) / period;
+
+    const barIdx = i + 1; // bars index (trs is offset by 1)
+    const hl2 = (bars[barIdx].high + bars[barIdx].low) / 2;
+
+    const basicUpper = hl2 + multiplier * atr;
+    const basicLower = hl2 - multiplier * atr;
+
+    // Final upper: min(basicUpper, prevUpperBand) if prevClose > prevUpperBand
+    upperBand = (basicUpper < prevUpperBand || bars[barIdx - 1].close > prevUpperBand)
+      ? basicUpper : prevUpperBand;
+    // Final lower: max(basicLower, prevLowerBand) if prevClose < prevLowerBand
+    lowerBand = (basicLower > prevLowerBand || bars[barIdx - 1].close < prevLowerBand)
+      ? basicLower : prevLowerBand;
+
+    // Direction
+    if (supertrend === prevUpperBand) {
+      direction = bars[barIdx].close > upperBand ? "BULLISH" : "BEARISH";
+    } else {
+      direction = bars[barIdx].close < lowerBand ? "BEARISH" : "BULLISH";
+    }
+
+    supertrend = direction === "BULLISH" ? lowerBand : upperBand;
+    prevUpperBand = upperBand;
+    prevLowerBand = lowerBand;
+  }
+
+  return { value: Math.round(supertrend * 100) / 100, direction };
+}
+
+// ── Pivot Points (Klasik + Fibonacci) ──
+function calcPivotPoints(bars: HistoricalBar[]): PivotPoints | null {
+  if (bars.length < 2) return null;
+  // Önceki günün OHLC'sini kullan
+  const prev = bars[bars.length - 2];
+  const h = prev.high, l = prev.low, c = prev.close;
+
+  const pp = (h + l + c) / 3;
+
+  const r = (n: number) => Math.round(n * 100) / 100;
+
+  return {
+    classic: {
+      pp: r(pp),
+      s1: r(2 * pp - h),
+      s2: r(pp - (h - l)),
+      s3: r(l - 2 * (h - pp)),
+      r1: r(2 * pp - l),
+      r2: r(pp + (h - l)),
+      r3: r(h + 2 * (pp - l)),
+    },
+    fibonacci: {
+      pp: r(pp),
+      s1: r(pp - 0.382 * (h - l)),
+      s2: r(pp - 0.618 * (h - l)),
+      s3: r(pp - 1.000 * (h - l)),
+      r1: r(pp + 0.382 * (h - l)),
+      r2: r(pp + 0.618 * (h - l)),
+      r3: r(pp + 1.000 * (h - l)),
+    },
+  };
+}
+
+function findNearestPivot(price: number, pivots: PivotPoints): { level: string; price: number; distance: number } {
+  const levels: { level: string; price: number }[] = [
+    { level: "PP", price: pivots.classic.pp },
+    { level: "S1", price: pivots.classic.s1 },
+    { level: "S2", price: pivots.classic.s2 },
+    { level: "S3", price: pivots.classic.s3 },
+    { level: "R1", price: pivots.classic.r1 },
+    { level: "R2", price: pivots.classic.r2 },
+    { level: "R3", price: pivots.classic.r3 },
+  ];
+
+  let nearest = levels[0];
+  let minDist = Math.abs(price - levels[0].price);
+  for (const lv of levels) {
+    const dist = Math.abs(price - lv.price);
+    if (dist < minDist) { nearest = lv; minDist = dist; }
+  }
+
+  return {
+    level: nearest.level,
+    price: nearest.price,
+    distance: Math.round(((price - nearest.price) / nearest.price) * 10000) / 100, // %
+  };
+}
+
 // ═══ MAIN ═══
 
 export function calculateExtraIndicators(bars: HistoricalBar[], bbUpper?: number | null, bbLower?: number | null): ExtraIndicators {
@@ -142,6 +266,8 @@ export function calculateExtraIndicators(bars: HistoricalBar[], bbUpper?: number
   const keltner = calcKeltner(bars);
   const elder = calcElderRay(bars);
   const kamaValue = calculateKAMA(bars.map(b => b.close));
+  const stResult = calcSupertrend(bars);
+  const pivots = calcPivotPoints(bars);
 
   // TTM Squeeze: Bollinger inside Keltner
   let ttmSqueeze = false;
@@ -163,5 +289,10 @@ export function calculateExtraIndicators(bars: HistoricalBar[], bbUpper?: number
     elderBearPower: elder?.bear ?? null,
     kama: kamaValue,
     priceVsKama: kamaValue != null ? (price > kamaValue ? "ABOVE" : "BELOW") : null,
+    // Yeni indikatörler
+    supertrend: stResult?.value ?? null,
+    supertrendDirection: stResult?.direction ?? null,
+    pivotPoints: pivots,
+    nearestPivot: pivots ? findNearestPivot(price, pivots) : null,
   };
 }

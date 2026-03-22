@@ -5,6 +5,7 @@
 
 import YahooFinance from "yahoo-finance2";
 import { cacheGet, cacheSet } from "@/lib/redis";
+import { getTCMBData, type TCMBData } from "@/lib/data/tcmb";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({
@@ -30,9 +31,15 @@ export interface MacroData {
   goldUsd: number | null;
   goldUsdChange: number | null;
 
-  // Türkiye 10Y Tahvil Faizi (proxy: TCMB politika faizi göstergesi)
-  turkey10Y: number | null;
+  // TCMB Verileri (US 10Y proxy yerine gerçek Türk verileri)
+  turkey10Y: number | null;     // Geriye uyumluluk: artık TCMB politika faizi
   turkey10YChange: number | null;
+
+  // TCMB Detay
+  tcmbPolicyRate: number | null;   // TCMB politika faizi (%)
+  tcmbInflation: number | null;    // TÜFE yıllık enflasyon (%)
+  tcmbRealRate: number | null;     // Reel faiz (politika faizi - enflasyon)
+  tcmbReserves: number | null;     // Brüt döviz rezervi (milyar $)
 
   // VIX — Küresel korku endeksi
   vix: number | null;
@@ -81,7 +88,7 @@ export async function getMacroData(): Promise<MacroData> {
     return macroCache.data;
   }
 
-  const [usdTry, eurTry, dxy, bist100, gold, turkey10Y, vix] = await Promise.all([
+  const [usdTry, eurTry, dxy, bist100, gold, turkey10Y, vix, tcmb] = await Promise.all([
     fetchQuote(MACRO_SYMBOLS.usdTry),
     fetchQuote(MACRO_SYMBOLS.eurTry),
     fetchQuote(MACRO_SYMBOLS.dxy),
@@ -89,6 +96,7 @@ export async function getMacroData(): Promise<MacroData> {
     fetchQuote(MACRO_SYMBOLS.goldUsd),
     fetchQuote(MACRO_SYMBOLS.turkey10Y),
     fetchQuote(MACRO_SYMBOLS.vix),
+    getTCMBData(),
   ]);
 
   // Makro skor hesaplama (0-100)
@@ -154,17 +162,27 @@ export async function getMacroData(): Promise<MacroData> {
     }
   }
 
-  // ── US 10Y Tahvil (hafifletilmiş — Türkiye ile korelasyonu düşük) ──
-  // NOT: ^TNX ABD 10Y faizi, Türkiye faizi değil. Sadece EM genel sentiment göstergesi.
-  // Ağırlık azaltıldı, asıl etki DXY ve USD/TRY'de.
-  if (turkey10Y.price != null) {
-    if (turkey10Y.price > 5) score -= 3;       // was -5
-    else if (turkey10Y.price < 3.5) score += 3; // was +5
+  // ── TCMB Reel Faiz (US 10Y proxy YERİNE gerçek Türk verileri) ──
+  // Pozitif reel faiz = TL'ye güven = hisse için olumlu (yabancı girişi)
+  // Negatif reel faiz = TL'den kaçış = hisse için olumsuz
+  if (tcmb.realRate != null) {
+    if (tcmb.realRate > 15) score += 10;       // Çok yüksek reel faiz = TL çekici
+    else if (tcmb.realRate > 5) score += 6;    // Pozitif reel faiz = olumlu
+    else if (tcmb.realRate > 0) score += 2;    // Hafif pozitif
+    else if (tcmb.realRate < -10) score -= 10; // Derin negatif reel = TL krizi
+    else if (tcmb.realRate < -5) score -= 6;   // Negatif reel
+    else if (tcmb.realRate < 0) score -= 2;    // Hafif negatif
+  }
 
-    if (turkey10Y.changePercent != null) {
-      if (turkey10Y.changePercent > 3) score -= 4; // was -8
-      else if (turkey10Y.changePercent < -3) score += 3; // was +5
-    }
+  // Döviz rezervi değişimi (varsa)
+  if (tcmb.reserves != null && tcmb.reserves < 70) {
+    score -= 5; // Düşük rezerv = kırılganlık
+  }
+
+  // US 10Y — artık sadece küçük EM sentiment göstergesi (ağırlığı çok düşürüldü)
+  if (turkey10Y.price != null) {
+    if (turkey10Y.price > 5) score -= 2;
+    else if (turkey10Y.price < 3.5) score += 2;
   }
 
   // ── Altın — Güvenli liman talebi (yükseliyorsa risk algısı artıyor) ──
@@ -191,8 +209,14 @@ export async function getMacroData(): Promise<MacroData> {
     bist100Change: bist100.changePercent,
     goldUsd: gold.price,
     goldUsdChange: gold.changePercent,
-    turkey10Y: turkey10Y.price,
+    // Geriye uyumluluk: turkey10Y artık TCMB politika faizini gösteriyor
+    turkey10Y: tcmb.policyRate ?? turkey10Y.price,
     turkey10YChange: turkey10Y.changePercent,
+    // TCMB detay verileri (tcmb.ts'den)
+    tcmbPolicyRate: tcmb.policyRate ?? null,
+    tcmbInflation: tcmb.inflation ?? null,
+    tcmbRealRate: tcmb.realRate ?? null,
+    tcmbReserves: tcmb.reserves ?? null,
     vix: vix.price,
     vixChange: vix.changePercent,
     macroScore: score,
