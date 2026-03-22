@@ -1,5 +1,6 @@
 import YahooFinance from "yahoo-finance2";
 import type { StockQuote, StockSearchResult } from "@/types";
+import { cacheGet, cacheSet } from "@/lib/redis";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -11,17 +12,24 @@ function toISSymbol(code: string): string {
 
 export async function getStockQuote(code: string): Promise<StockQuote | null> {
   const symbol = toISSymbol(code);
+  const cacheKey = `quote:${code.replace(".IS", "").toUpperCase()}`;
+
+  // Check Redis cache (5 min TTL)
+  const cached = await cacheGet<StockQuote>(cacheKey);
+  if (cached) return cached;
 
   try {
     const quote = await yf.quote(symbol);
     if (quote && quote.regularMarketPrice) {
-      return {
+      const result: StockQuote = {
         code: code.replace(".IS", "").toUpperCase(),
         name: quote.shortName ?? quote.longName ?? code,
         price: quote.regularMarketPrice ?? null,
         changePercent: quote.regularMarketChangePercent ?? null,
         volume: quote.regularMarketVolume ?? null,
       };
+      await cacheSet(cacheKey, result, 300); // 5 min
+      return result;
     }
   } catch {
     // quote failed, try historical fallback
@@ -57,13 +65,15 @@ export async function getStockQuote(code: string): Promise<StockQuote | null> {
         // use code as name
       }
 
-      return {
+      const result: StockQuote = {
         code: code.replace(".IS", "").toUpperCase(),
         name,
         price: closePrice ?? null,
         changePercent,
         volume: (latest.volume as number) ?? null,
       };
+      await cacheSet(cacheKey, result, 300); // 5 min
+      return result;
     }
   } catch (error) {
     console.error(`Yahoo Finance error for ${symbol}:`, error);
