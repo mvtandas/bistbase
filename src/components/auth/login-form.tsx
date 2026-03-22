@@ -72,18 +72,32 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
     }
   }
 
-  function handleOtpSubmit() {
+  async function handleOtpSubmit() {
     const code = otp.join("");
     if (code.length !== 6) return;
     setLoading(true);
     setError("");
 
-    const params = new URLSearchParams({
-      callbackUrl: "/onboarding",
-      token: code,
-      email,
-    });
-    window.location.href = `/api/auth/callback/email?${params.toString()}`;
+    try {
+      const result = await signIn("otp", {
+        email,
+        code,
+        redirect: false,
+        callbackUrl: "/onboarding",
+      });
+
+      if (result?.error) {
+        setError("Geçersiz veya süresi dolmuş kod. Tekrar deneyin.");
+        setLoading(false);
+        setOtp(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
+      } else {
+        window.location.href = "/onboarding";
+      }
+    } catch {
+      setError("Bir hata oluştu. Tekrar deneyin.");
+      setLoading(false);
+    }
   }
 
   // ─── OTP Step ───

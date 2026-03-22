@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Email from "next-auth/providers/email";
+import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,14 @@ const resend = new Resend(process.env.EMAIL_SERVER_PASSWORD);
 
 function generateOTP() {
   return crypto.randomInt(100000, 999999).toString();
+}
+
+/** Hash token the same way auth.js does internally */
+function hashToken(token: string) {
+  return crypto
+    .createHash("sha256")
+    .update(`${token}${process.env.AUTH_SECRET}`)
+    .digest("hex");
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -45,6 +54,63 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.error("Email send error:", error);
           throw new Error("E-posta gönderilemedi");
         }
+      },
+    }),
+    Credentials({
+      id: "otp",
+      name: "OTP",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        code: { label: "Code", type: "text" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email as string;
+        const code = credentials?.code as string;
+        if (!email || !code) return null;
+
+        // Hash the OTP the same way auth.js hashes email tokens
+        const hashedToken = hashToken(code);
+
+        // Look up the verification token
+        const verificationToken = await prisma.verificationToken.findFirst({
+          where: { identifier: email, token: hashedToken },
+        });
+
+        if (!verificationToken) return null;
+
+        // Check expiry
+        if (verificationToken.expires < new Date()) {
+          // Clean up expired token
+          await prisma.verificationToken.delete({
+            where: {
+              identifier_token: {
+                identifier: email,
+                token: hashedToken,
+              },
+            },
+          });
+          return null;
+        }
+
+        // Delete the used token
+        await prisma.verificationToken.delete({
+          where: {
+            identifier_token: {
+              identifier: email,
+              token: hashedToken,
+            },
+          },
+        });
+
+        // Find or create user
+        let user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+          user = await prisma.user.create({
+            data: { email },
+          });
+        }
+
+        return { id: user.id, email: user.email };
       },
     }),
   ],
