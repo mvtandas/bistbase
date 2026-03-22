@@ -66,7 +66,7 @@ export default function RootLayout({
       lang="tr"
       className={`${inter.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full bg-background text-foreground">
+      <body className="min-h-full bg-background text-foreground" suppressHydrationWarning>
         <Providers>
           {children}
           <Toaster />

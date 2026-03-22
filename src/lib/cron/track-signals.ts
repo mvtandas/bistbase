@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getStockQuote } from "@/lib/stock/yahoo";
+import { getIstanbulToday } from "@/lib/date-utils";
 
 export async function trackSignalOutcomes(): Promise<{
   updated1D: number;
@@ -106,9 +107,9 @@ export async function trackSignalOutcomes(): Promise<{
 }
 
 function daysAgo(days: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const d = getIstanbulToday();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d;
 }
 
 function sleep(ms: number) {

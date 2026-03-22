@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { sendEmail, buildMorningDigestHtml } from "@/lib/email";
+import { getIstanbulYesterday } from "@/lib/date-utils";
 
 export async function sendMorningDigests(): Promise<{ sent: number; failed: number }> {
   let sent = 0;
@@ -21,9 +22,7 @@ export async function sendMorningDigests(): Promise<{ sent: number; failed: numb
   });
 
   // Dünün verileri (sabah gönderiyoruz, dünkü analiz)
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayDate = new Date(Date.UTC(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate()));
+  const yesterdayDate = getIstanbulYesterday();
 
   for (const user of users) {
     if (!user.email) {

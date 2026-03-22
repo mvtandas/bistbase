@@ -17,11 +17,8 @@ import { calculateVerdict, type VerdictInput } from "@/lib/stock/verdict";
 import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
 import { calculateBacktest } from "@/lib/stock/backtest";
-
-function getToday(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-}
+import { filterSignals } from "@/lib/stock/signal-filter";
+import { getIstanbulToday, toIstanbulDateUTC } from "@/lib/date-utils";
 
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -32,7 +29,7 @@ export async function runDailyAnalysis(): Promise<{
   skipped: number;
   failed: number;
 }> {
-  const today = getToday();
+  const today = getIstanbulToday();
   let processed = 0;
   let skipped = 0;
   let failed = 0;
@@ -296,8 +293,16 @@ export async function runDailyAnalysis(): Promise<{
           });
         }
 
-        // 8b. Signals + alert (upsert ile duplikasyon önleme)
-        for (const signal of signals) {
+        // 8b. Signal filtering (debounce + liquidity + minimum strength)
+        const avgVolumeTL = volume && price ? volume * price / 20 : null; // rough daily avg
+        const { filtered: filteredSignals } = await filterSignals(signals, {
+          stockCode,
+          date: today,
+          avgVolumeTL,
+        });
+
+        // 8b2. Signals + alert (upsert ile duplikasyon önleme)
+        for (const signal of filteredSignals) {
           await prisma.signal.upsert({
             where: {
               stockCode_date_signalType_signalDirection: {
@@ -322,9 +327,9 @@ export async function runDailyAnalysis(): Promise<{
           });
         }
 
-        // 8b2. Sinyal alarmı gönder (güçlü sinyaller için)
-        if (signals.length > 0) {
-          const strongSignals = signals.filter(s => s.strength >= 65);
+        // 8b3. Sinyal alarmı gönder (güçlü sinyaller için)
+        if (filteredSignals.length > 0) {
+          const strongSignals = filteredSignals.filter(s => s.strength >= 65);
           if (strongSignals.length > 0) {
             try {
               const { sendEmail, buildSignalAlertHtml } = await import("@/lib/email");
@@ -527,7 +532,7 @@ export async function runBackfill(daysBack: number = 30, skipAI: boolean = false
       for (let i = startIdx; i < allBars.length; i++) {
         const bar = allBars[i];
         const barDate = new Date(bar.date + "T00:00:00Z");
-        const dateUTC = new Date(Date.UTC(barDate.getFullYear(), barDate.getMonth(), barDate.getDate()));
+        const dateUTC = toIstanbulDateUTC(barDate);
 
         // Zaten COMPLETED varsa atla
         const existing = await prisma.dailySummary.findUnique({

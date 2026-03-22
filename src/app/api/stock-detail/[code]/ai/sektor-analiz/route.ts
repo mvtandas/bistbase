@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
+import { getIstanbulToday } from "@/lib/date-utils";
 import { getFundamentalData, scoreFundamentals } from "@/lib/stock/fundamentals";
 import { getMacroData } from "@/lib/stock/macro";
 import { calculateSectorContext } from "@/lib/stock/sectors";
@@ -25,8 +26,7 @@ export async function GET(
   const { code } = await params;
   const stockCode = code.toUpperCase();
   const insightType = "sektor-analiz";
-  const today = new Date();
-  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const todayUTC = getIstanbulToday();
 
   try {
     const cached = await getCachedInsight(stockCode, insightType, todayUTC);

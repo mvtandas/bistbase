@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars, getHistoricalBarsInterval } from "@/lib/stock/yahoo";
+import { getIstanbulToday } from "@/lib/date-utils";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
 import { calculateCompositeScore } from "@/lib/stock/scoring";
 import { detectSignals } from "@/lib/stock/signals";
@@ -34,8 +35,7 @@ export async function GET(
   const tf = new URL(request.url).searchParams.get("timeframe") as AnalysisTimeframe | null;
   const timeframe: AnalysisTimeframe = tf === "weekly" || tf === "monthly" ? tf : "daily";
 
-  const today = new Date();
-  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const todayUTC = getIstanbulToday();
 
   try {
     // 1. Check DB cache first

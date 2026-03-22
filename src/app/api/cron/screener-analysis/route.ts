@@ -29,17 +29,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const today = new Date();
-  const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  // İstanbul timezone'unda bugünün tarihini al (Vercel UTC'de çalışır, local TR'de)
+  const dateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const todayDate = new Date(Date.UTC(y, m - 1, d));
 
   let processed = 0;
   let failed = 0;
   let skipped = 0;
 
   try {
-    // 1. Check what's already done today
+    // 1. Check what's already done today (range query for timezone safety)
+    const tomorrowDate = new Date(todayDate);
+    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
     const existing = await prisma.screenerSnapshot.findMany({
-      where: { date: todayDate },
+      where: { date: { gte: todayDate, lt: tomorrowDate } },
       select: { stockCode: true },
     });
     const existingSet = new Set(existing.map(s => s.stockCode));

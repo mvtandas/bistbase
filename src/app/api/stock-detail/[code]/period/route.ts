@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars, getHistoricalBarsInterval } from "@/lib/stock/yahoo";
+import { getIstanbulToday } from "@/lib/date-utils";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
 import { calculateCompositeScore } from "@/lib/stock/scoring";
 import { detectSignals } from "@/lib/stock/signals";
@@ -183,8 +184,7 @@ export async function GET(
 
     // 12. Past analyses from DB (fast, no AI call)
     const timeframe: AnalysisTimeframe = range === "week" ? "weekly" : "monthly";
-    const today = new Date();
-    const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+    const todayUTC = getIstanbulToday();
 
     type PeriodSummary = { id: string; date: string; closePrice: number | null; changePercent: number | null; aiSummaryText: string | null; compositeScore: number | null; bullCase: string | null; bearCase: string | null; confidence: string | null; sentimentValue: number | null };
     let pastAnalyses: PeriodSummary[] = [];

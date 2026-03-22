@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getIstanbulToday } from "@/lib/date-utils";
 
 export async function GET() {
   try {
-    const today = new Date();
-    const todayDate = new Date(
-      Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-    );
+    const todayDate = getIstanbulToday();
 
     // Try today first, fallback to last 3 days
     let summaries = await prisma.dailySummary.findMany({

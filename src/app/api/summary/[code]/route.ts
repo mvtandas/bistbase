@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { toIstanbulDateUTC } from "@/lib/date-utils";
 
-function toUTCDate(d: Date): Date {
-  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-}
+const toUTCDate = toIstanbulDateUTC;
 
 function serialize(s: {
   id: string; stockCode: string; date: Date;

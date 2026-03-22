@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { STOCK_LISTS, type ScreenerIndex } from "@/lib/constants";
+import { getIstanbulToday, dayRange } from "@/lib/date-utils";
 import type { ScreenerResult, ScreenerStockResult, SectorSummary, MarketSummary } from "./batch-analysis";
 import { SECTOR_INDICES } from "./sectors";
 
@@ -12,23 +13,11 @@ import { SECTOR_INDICES } from "./sectors";
 // DB QUERIES
 // ═══════════════════════════════════════
 
-function getToday(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-}
-
-function getYesterday(): Date {
-  const d = getToday();
-  d.setDate(d.getDate() - 1);
-  return d;
-}
-
 export async function getScreenerSnapshots(
   index: ScreenerIndex,
 ): Promise<{ snapshots: Awaited<ReturnType<typeof prisma.screenerSnapshot.findMany>>; stale: boolean }> {
-  const today = getToday();
+  const today = getIstanbulToday();
 
-  // Build where clause based on index
   // Boolean flag'li endeksler (cron tarafından set edilen)
   const booleanFilterMap: Record<string, Record<string, boolean>> = {
     bist30: { inBist30: true },
@@ -36,28 +25,29 @@ export async function getScreenerSnapshots(
     bist100: { inBist100: true },
   };
 
-  let baseWhere;
-  if (index === "bistall") {
-    baseWhere = { date: today };
-  } else if (booleanFilterMap[index]) {
-    baseWhere = { date: today, ...booleanFilterMap[index] };
-  } else {
-    // Tematik endeksler: stockCode listesine göre filtrele
-    const stockList = STOCK_LISTS[index];
-    baseWhere = { date: today, stockCode: { in: [...stockList] } };
+  // Index'e göre filtre (tarih hariç)
+  let indexFilter: Record<string, unknown> = {};
+  if (index !== "bistall") {
+    if (booleanFilterMap[index]) {
+      indexFilter = booleanFilterMap[index];
+    } else {
+      const stockList = STOCK_LISTS[index];
+      indexFilter = { stockCode: { in: [...stockList] } };
+    }
   }
 
+  // Bugünün range query'si
   let snapshots = await prisma.screenerSnapshot.findMany({
-    where: baseWhere,
+    where: { date: dayRange(today), ...indexFilter },
     orderBy: { compositeScore: "desc" },
   });
 
   // Bugün veri yoksa dünkü veriyi dön
   if (snapshots.length === 0) {
-    const yesterday = getYesterday();
-    const fallbackWhere = { ...baseWhere, date: yesterday };
+    const yesterday = new Date(today);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
     snapshots = await prisma.screenerSnapshot.findMany({
-      where: fallbackWhere,
+      where: { date: dayRange(yesterday), ...indexFilter },
       orderBy: { compositeScore: "desc" },
     });
     return { snapshots, stale: true };

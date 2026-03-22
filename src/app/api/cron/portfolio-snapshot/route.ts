@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getIstanbulToday } from "@/lib/date-utils";
 
 export const maxDuration = 300;
 
@@ -16,10 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const today = new Date();
-    const todayDate = new Date(
-      Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-    );
+    const todayDate = getIstanbulToday();
 
     // Tüm kullanıcıların portföylerini getir
     const users = await prisma.portfolio.findMany({

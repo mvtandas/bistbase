@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { sendEmail, buildScoreChangeAlertHtml } from "@/lib/email";
+import { getIstanbulToday, getIstanbulYesterday } from "@/lib/date-utils";
 
 export async function sendScoreChangeAlerts(): Promise<{ sent: number; skipped: number }> {
   let sent = 0, skipped = 0;
@@ -21,11 +22,8 @@ export async function sendScoreChangeAlerts(): Promise<{ sent: number; skipped: 
 
   if (users.length === 0) return { sent: 0, skipped: 0 };
 
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const todayDate = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-  const yesterdayDate = new Date(Date.UTC(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate()));
+  const todayDate = getIstanbulToday();
+  const yesterdayDate = getIstanbulYesterday();
 
   for (const user of users) {
     if (!user.email || user.portfolios.length === 0) { skipped++; continue; }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { cacheGet } from "@/lib/redis";
+import { getIstanbulToday } from "@/lib/date-utils";
 import { generateSpecializedInsight } from "@/lib/ai/specialized";
 import { buildPortfoyOzetPrompt } from "@/lib/ai/portfolio-prompts";
 import { getCachedPortfolioInsight, savePortfolioInsight } from "@/lib/ai/portfolio-insight-cache";
@@ -35,8 +36,7 @@ export async function GET() {
 
   const userId = session.user.id;
   const insightType = "portfoy-ozet";
-  const today = new Date();
-  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const todayUTC = getIstanbulToday();
 
   try {
     // Cache check

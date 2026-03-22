@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars } from "@/lib/stock/yahoo";
+import { getIstanbulToday } from "@/lib/date-utils";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
 import { detectSignals } from "@/lib/stock/signals";
 import { detectCandlestickPatterns } from "@/lib/stock/candlesticks";
@@ -29,8 +30,7 @@ export async function GET(
   const { code } = await params;
   const stockCode = code.toUpperCase();
   const insightType = "islem-kurulumu";
-  const today = new Date();
-  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const todayUTC = getIstanbulToday();
 
   try {
     const cached = await getCachedInsight(stockCode, insightType, todayUTC);

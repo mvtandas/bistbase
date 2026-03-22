@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars } from "@/lib/stock/yahoo";
+import { getIstanbulToday } from "@/lib/date-utils";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
 import { calculateCompositeScore } from "@/lib/stock/scoring";
 import { detectSignals } from "@/lib/stock/signals";
@@ -30,8 +31,7 @@ export async function GET(
   const { code } = await params;
   const stockCode = code.toUpperCase();
   const insightType = "akilli-ozet";
-  const today = new Date();
-  const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const todayUTC = getIstanbulToday();
 
   try {
     // Cache check (Redis → DB)
