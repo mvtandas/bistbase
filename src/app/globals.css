@@ -190,6 +190,14 @@
 .stagger-5 { animation-delay: 0.25s; animation-fill-mode: both; }
 .stagger-6 { animation-delay: 0.3s; animation-fill-mode: both; }
 
+/* ═══ Login Page Animations ═══ */
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -20px) scale(1.05); }
+  50% { transform: translate(-20px, 30px) scale(0.95); }
+  75% { transform: translate(20px, 20px) scale(1.02); }
+}
+
 /* ═══ Landing Page Animations ═══ */
 
 @keyframes gradientShift {

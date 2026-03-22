@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, ArrowRight, ShieldCheck, ArrowLeft } from "lucide-react";
+import { Mail, ArrowRight, ShieldCheck, ArrowLeft, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function LoginForm({ isVerify }: { isVerify: boolean }) {
   const [email, setEmail] = useState("");
@@ -13,7 +11,17 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"email" | "otp">(isVerify ? "otp" : "email");
   const [error, setError] = useState("");
+  const [emailFocused, setEmailFocused] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Auto-submit when all 6 digits are entered
+  useEffect(() => {
+    const code = otp.join("");
+    if (code.length === 6 && step === "otp") {
+      handleOtpSubmit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otp]);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,14 +72,12 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
     }
   }
 
-  async function handleOtpSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleOtpSubmit() {
     const code = otp.join("");
     if (code.length !== 6) return;
     setLoading(true);
     setError("");
 
-    // NextAuth email callback — tarayıcı doğrudan yönlendirilmeli (cookie'ler için)
     const params = new URLSearchParams({
       callbackUrl: "/onboarding",
       token: code,
@@ -80,21 +86,36 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
     window.location.href = `/api/auth/callback/email?${params.toString()}`;
   }
 
+  // ─── OTP Step ───
   if (step === "otp") {
     return (
-      <Card className="w-full max-w-md mx-auto border-border/50 bg-card/50">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-ai-primary/10">
-            <ShieldCheck className="h-6 w-6 text-ai-primary" />
+      <div className="relative group">
+        {/* Glow border effect */}
+        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-ai-primary/20 via-ai-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+        <div className="relative rounded-2xl border border-border/40 bg-card/40 backdrop-blur-xl p-8 shadow-[0_0_60px_-15px] shadow-ai-primary/[0.08]">
+          {/* Icon */}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-ai-primary/20 blur-xl animate-pulse" />
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-ai-primary/20 to-ai-premium/10 border border-ai-primary/20">
+                <ShieldCheck className="h-6 w-6 text-ai-primary" />
+              </div>
+            </div>
           </div>
-          <CardTitle className="text-xl">Doğrulama Kodu</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            <span className="text-foreground/80 font-medium">{email}</span> adresine 6 haneli kod gönderdik.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleOtpSubmit} className="space-y-4">
-            <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
+
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-xl font-semibold text-foreground">Doğrulama Kodu</h1>
+            <p className="mt-2 text-sm text-muted-foreground/70">
+              <span className="text-foreground/70 font-medium">{email}</span>
+              <br />adresine 6 haneli kod gönderdik
+            </p>
+          </div>
+
+          {/* OTP Inputs */}
+          <form onSubmit={(e) => { e.preventDefault(); handleOtpSubmit(); }}>
+            <div className="flex justify-center gap-2.5 mb-6" onPaste={handleOtpPaste}>
               {otp.map((digit, i) => (
                 <input
                   key={i}
@@ -105,74 +126,172 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
                   value={digit}
                   onChange={e => handleOtpChange(i, e.target.value)}
                   onKeyDown={e => handleOtpKeyDown(i, e)}
-                  className="w-12 h-14 text-center text-xl font-mono font-bold bg-secondary border border-border/50 rounded-lg text-foreground outline-none focus:border-ai-primary focus:ring-1 focus:ring-ai-primary/50 transition-colors"
+                  className={cn(
+                    "w-12 h-14 text-center text-xl font-mono font-bold rounded-xl outline-none transition-all duration-200",
+                    "bg-background/50 border-2 text-foreground",
+                    digit
+                      ? "border-ai-primary/40 shadow-[0_0_12px_-3px] shadow-ai-primary/20"
+                      : "border-border/30 hover:border-border/50",
+                    "focus:border-ai-primary focus:shadow-[0_0_20px_-5px] focus:shadow-ai-primary/30",
+                    "placeholder:text-muted-foreground/20",
+                  )}
+                  style={{ animationDelay: `${i * 0.05}s` }}
                   autoFocus={i === 0}
                 />
               ))}
             </div>
 
+            {/* Error */}
             {error && (
-              <p className="text-xs text-red-400 text-center">{error}</p>
+              <div className="mb-4 rounded-lg bg-loss/10 border border-loss/20 px-3 py-2 text-center">
+                <p className="text-xs text-loss">{error}</p>
+              </div>
             )}
 
-            <Button
+            {/* Submit */}
+            <button
               type="submit"
               disabled={loading || otp.join("").length !== 6}
-              className="w-full h-12 bg-ai-primary hover:bg-ai-primary/90 text-white"
+              className={cn(
+                "relative w-full h-12 rounded-xl font-medium text-sm transition-all duration-300 overflow-hidden",
+                "bg-gradient-to-r from-ai-primary to-ai-primary/80 text-white",
+                "hover:shadow-[0_0_30px_-5px] hover:shadow-ai-primary/40 hover:brightness-110",
+                "disabled:opacity-40 disabled:hover:shadow-none disabled:hover:brightness-100",
+                "active:scale-[0.98]",
+              )}
             >
-              {loading ? "Doğrulanıyor..." : "Giriş Yap"}
-            </Button>
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Doğrulanıyor...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Giriş Yap
+                </span>
+              )}
+            </button>
 
+            {/* Back */}
             <button
               type="button"
               onClick={() => { setStep("email"); setOtp(["", "", "", "", "", ""]); setError(""); }}
-              className="flex items-center justify-center gap-1.5 w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center justify-center gap-1.5 w-full mt-4 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             >
               <ArrowLeft className="h-3 w-3" />
               Farklı e-posta kullan
             </button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
+  // ─── Email Step ───
   return (
-    <Card className="w-full max-w-md mx-auto border-border/50 bg-card/50">
-      <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-ai-primary/10">
-          <Mail className="h-6 w-6 text-ai-primary" />
-        </div>
-        <CardTitle className="text-xl">Giriş Yap</CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">
-          E-posta adresinize bir doğrulama kodu göndereceğiz.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
-          <Input
-            type="email"
-            placeholder="E-posta adresiniz"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-12 bg-secondary border-border/50"
-            required
-          />
+    <div className="relative group">
+      {/* Glow border effect */}
+      <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-ai-primary/20 via-ai-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
+      <div className="relative rounded-2xl border border-border/40 bg-card/40 backdrop-blur-xl p-8 shadow-[0_0_60px_-15px] shadow-ai-primary/[0.08]">
+        {/* Icon */}
+        <div className="flex justify-center mb-6">
+          <div className="relative">
+            <div className={cn(
+              "absolute inset-0 rounded-full blur-xl transition-all duration-500",
+              emailFocused ? "bg-ai-primary/25 scale-125" : "bg-ai-primary/15"
+            )} />
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-ai-primary/20 to-ai-premium/10 border border-ai-primary/20">
+              <Mail className="h-6 w-6 text-ai-primary" />
+            </div>
+          </div>
+        </div>
+
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-xl font-semibold text-foreground">Hoş Geldiniz</h1>
+          <p className="mt-2 text-sm text-muted-foreground/60">
+            E-posta adresinize bir doğrulama kodu göndereceğiz
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleEmailSubmit} className="space-y-4">
+          <div className="relative">
+            <input
+              type="email"
+              placeholder="E-posta adresiniz"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+              className={cn(
+                "w-full h-12 rounded-xl px-4 text-sm outline-none transition-all duration-300",
+                "bg-background/50 border-2 text-foreground placeholder:text-muted-foreground/30",
+                emailFocused
+                  ? "border-ai-primary/50 shadow-[0_0_20px_-5px] shadow-ai-primary/20"
+                  : "border-border/30 hover:border-border/50",
+              )}
+              required
+            />
+          </div>
+
+          {/* Error */}
           {error && (
-            <p className="text-xs text-red-400 text-center">{error}</p>
+            <div className="rounded-lg bg-loss/10 border border-loss/20 px-3 py-2 text-center">
+              <p className="text-xs text-loss">{error}</p>
+            </div>
           )}
 
-          <Button
+          <button
             type="submit"
-            disabled={loading}
-            className="w-full h-12 bg-ai-primary hover:bg-ai-primary/90 text-white"
+            disabled={loading || !email}
+            className={cn(
+              "relative w-full h-12 rounded-xl font-medium text-sm transition-all duration-300 overflow-hidden",
+              "bg-gradient-to-r from-ai-primary to-ai-primary/80 text-white",
+              "hover:shadow-[0_0_30px_-5px] hover:shadow-ai-primary/40 hover:brightness-110",
+              "disabled:opacity-40 disabled:hover:shadow-none disabled:hover:brightness-100",
+              "active:scale-[0.98]",
+            )}
           >
-            {loading ? "Gönderiliyor..." : "Doğrulama Kodu Gönder"}
-            {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
-          </Button>
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                Gönderiliyor...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                Doğrulama Kodu Gönder
+                <ArrowRight className="h-4 w-4" />
+              </span>
+            )}
+          </button>
         </form>
-      </CardContent>
-    </Card>
+
+        {/* Divider */}
+        <div className="mt-6 flex items-center gap-3">
+          <div className="flex-1 h-px bg-border/20" />
+          <span className="text-[10px] text-muted-foreground/30 uppercase tracking-widest">Güvenli Giriş</span>
+          <div className="flex-1 h-px bg-border/20" />
+        </div>
+
+        {/* Trust badges */}
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/30">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            256-bit SSL
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/30">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            Şifresiz Giriş
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/30">
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            Anlık Doğrulama
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
