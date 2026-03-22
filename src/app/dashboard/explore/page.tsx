@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStockSearch } from "@/hooks/use-stock-search";
+import { useAddStock, useRemoveStock } from "@/hooks/use-portfolio-mutations";
+import { QUERY_KEYS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -15,8 +17,9 @@ import {
   TrendingUp,
   Compass,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { PortfolioEditModal } from "@/components/dashboard/portfolio-edit-modal";
 
 const POPULAR_STOCKS = [
   { code: "THYAO", name: "Türk Hava Yolları" },
@@ -38,34 +41,62 @@ const POPULAR_STOCKS = [
 
 export default function ExplorePage() {
   const [query, setQuery] = useState("");
-  const [addedCodes, setAddedCodes] = useState<Set<string>>(new Set());
+  const [editStock, setEditStock] = useState<string | null>(null);
   const { results, loading } = useStockSearch(query);
-  const router = useRouter();
+  const addStock = useAddStock();
+  const removeStock = useRemoveStock();
+
+  // Fetch current portfolio to know which stocks are already added
+  const { data: portfolioData } = useQuery<{ holdings?: { stockCode: string }[] }>({
+    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
+    queryFn: () => fetch("/api/portfolio-intelligence").then((r) => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const portfolioCodes = useMemo(() => {
+    const codes = new Set<string>();
+    if (portfolioData?.holdings) {
+      for (const h of portfolioData.holdings) {
+        codes.add(h.stockCode);
+      }
+    }
+    return codes;
+  }, [portfolioData]);
 
   const showSearchResults = query.length >= 2;
 
-  async function addToPortfolio(code: string, e: React.MouseEvent) {
+  // Track per-stock loading state
+  const [mutatingCodes, setMutatingCodes] = useState<Set<string>>(new Set());
+
+  async function togglePortfolio(code: string, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (addedCodes.has(code)) return;
+    if (mutatingCodes.has(code)) return;
+
+    setMutatingCodes((prev) => new Set(prev).add(code));
+
+    const inPortfolio = portfolioCodes.has(code);
+
     try {
-      const res = await fetch("/api/portfolio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stockCode: code }),
-      });
-      if (res.ok) {
-        setAddedCodes((prev) => new Set(prev).add(code));
-        toast.success(`${code} portföyünüze eklendi`);
-        router.refresh();
+      if (inPortfolio) {
+        await removeStock.mutateAsync(code);
+      } else {
+        await addStock.mutateAsync(code);
+        setEditStock(code);
       }
-    } catch {
-      toast.error("Bir hata oluştu");
+    } finally {
+      setMutatingCodes((prev) => {
+        const next = new Set(prev);
+        next.delete(code);
+        return next;
+      });
     }
   }
 
   function StockItem({ code, name }: { code: string; name: string }) {
-    const isAdded = addedCodes.has(code);
+    const inPortfolio = portfolioCodes.has(code);
+    const isMutating = mutatingCodes.has(code);
+
     return (
       <div className="flex items-center justify-between px-4 py-3 hover:bg-accent/50 transition-colors">
         <Link
@@ -78,17 +109,23 @@ export default function ExplorePage() {
         </Link>
         <button
           type="button"
-          onClick={(e) => addToPortfolio(code, e)}
-          disabled={isAdded}
+          onClick={(e) => togglePortfolio(code, e)}
+          disabled={isMutating}
           className={cn(
-            "flex items-center justify-center h-8 w-8 rounded-md transition-colors flex-shrink-0",
-            isAdded
-              ? "bg-gain/10 text-gain cursor-default"
+            "flex items-center justify-center h-8 w-8 rounded-md transition-colors flex-shrink-0 disabled:opacity-50",
+            inPortfolio
+              ? "bg-gain/10 text-gain hover:bg-loss/10 hover:text-loss"
               : "bg-secondary hover:bg-ai-primary/10 hover:text-ai-primary text-muted-foreground"
           )}
-          title={isAdded ? "Portföyde" : "Portföye ekle"}
+          title={inPortfolio ? "Portföyden çıkar" : "Portföye ekle"}
         >
-          {isAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {isMutating ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : inPortfolio ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
         </button>
       </div>
     );
@@ -155,6 +192,14 @@ export default function ExplorePage() {
             ))}
           </Card>
         </div>
+      )}
+
+      {editStock && (
+        <PortfolioEditModal
+          stockCode={editStock}
+          mode="add"
+          onClose={() => setEditStock(null)}
+        />
       )}
     </div>
   );

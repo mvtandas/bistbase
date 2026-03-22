@@ -248,8 +248,6 @@
 .scroll-hidden { opacity: 0; }
 .scroll-revealed { animation: revealUp 0.7s ease-out forwards; }
 
-html { scroll-behavior: smooth; }
-
 /* ═══ Bento Card ═══ */
 .bento-card {
   @apply relative rounded-2xl border border-border/40 bg-card/30 backdrop-blur-sm overflow-hidden min-w-0 h-full flex flex-col;
@@ -258,6 +256,49 @@ html { scroll-behavior: smooth; }
 .bento-card:hover {
   border-color: oklch(0.673 0.182 276.935 / 0.25);
   box-shadow: 0 0 30px -10px oklch(0.673 0.182 276.935 / 0.08);
+}
+
+/* ═══ Noise Texture Overlay ═══ */
+.noise-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* ═══ Sparkline Draw Animation ═══ */
+.demo-sparkline-draw {
+  animation: sparklineDraw 1.5s ease-out forwards;
+  animation-delay: 0.5s;
+}
+
+@keyframes sparklineDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ═══ Hero Sparkline ═══ */
+.hero-sparkline {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  animation: sparklineDraw 2s ease-out forwards;
+  animation-delay: 1s;
+}
+
+/* ═══ Shimmer Line ═══ */
+.shimmer-line {
+  background: linear-gradient(90deg, oklch(1 0 0 / 0.05), oklch(1 0 0 / 0.1), oklch(1 0 0 / 0.05));
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ═══ Enhanced Smooth Scroll ═══ */
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 .bento-card-header {
   @apply flex items-center gap-2.5 px-6 py-4 border-b border-border/20;

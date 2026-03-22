@@ -1,39 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useUpdateStock } from "@/hooks/use-portfolio-mutations";
 import { X } from "lucide-react";
 
 interface PortfolioEditModalProps {
   stockCode: string;
   onClose: () => void;
+  mode?: "add" | "edit";
 }
 
-export function PortfolioEditModal({ stockCode, onClose }: PortfolioEditModalProps) {
+export function PortfolioEditModal({ stockCode, onClose, mode = "edit" }: PortfolioEditModalProps) {
   const [quantity, setQuantity] = useState("");
   const [avgCost, setAvgCost] = useState("");
-  const [saving, setSaving] = useState(false);
-  const queryClient = useQueryClient();
+  const updateStock = useUpdateStock();
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await fetch("/api/portfolio", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stockCode,
-          quantity: quantity ? parseFloat(quantity) : 0,
-          avgCost: avgCost ? parseFloat(avgCost) : 0,
-        }),
-      });
-      queryClient.invalidateQueries({ queryKey: ["portfolio-intelligence"] });
+  const isAdd = mode === "add";
+
+  const handleSave = () => {
+    if (isAdd && !quantity && !avgCost) {
+      // Add mode with no data entered — just close
       onClose();
-    } catch {
-      // error handling
-    } finally {
-      setSaving(false);
+      return;
     }
+    updateStock.mutate(
+      {
+        stockCode,
+        quantity: quantity ? parseFloat(quantity) : 0,
+        avgCost: avgCost ? parseFloat(avgCost) : 0,
+      },
+      { onSuccess: () => onClose() }
+    );
   };
 
   return (
@@ -74,10 +71,10 @@ export function PortfolioEditModal({ stockCode, onClose }: PortfolioEditModalPro
 
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 rounded-lg border border-border/40 px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted transition-colors">
-            Vazgeç
+            {isAdd ? "Atla" : "Vazgeç"}
           </button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 rounded-lg bg-ai-primary text-white px-3 py-2 text-[11px] font-medium hover:bg-ai-primary/90 transition-colors disabled:opacity-50">
-            {saving ? "Kaydediliyor..." : "Kaydet"}
+          <button onClick={handleSave} disabled={updateStock.isPending} className="flex-1 rounded-lg bg-ai-primary text-white px-3 py-2 text-[11px] font-medium hover:bg-ai-primary/90 transition-colors disabled:opacity-50">
+            {updateStock.isPending ? "Kaydediliyor..." : "Kaydet"}
           </button>
         </div>
       </div>

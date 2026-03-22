@@ -1,5 +1,61 @@
+"use client";
+
+import { useRef, useState, type MouseEvent } from "react";
+import { motion, useInView } from "framer-motion";
 import { Sparkles, Radio, Shield, Briefcase, Mail } from "lucide-react";
-import { ScrollReveal } from "./scroll-reveal";
+
+function BentoCard({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-5% 0px" });
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouse = (e: MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{
+        duration: 0.6,
+        delay,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      }}
+      className={`bento-card p-6 h-full group relative ${className}`}
+      onMouseMove={handleMouse}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Spotlight effect following cursor */}
+      <div
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background: isHovered
+            ? `radial-gradient(400px circle at ${mousePos.x}px ${mousePos.y}px, oklch(0.673 0.182 276.935 / 0.06), transparent 60%)`
+            : undefined,
+        }}
+      />
+      <div className="relative z-10">{children}</div>
+    </motion.div>
+  );
+}
 
 const features = [
   {
@@ -12,7 +68,7 @@ const features = [
       <div className="mt-4 rounded-lg border border-border/20 bg-background/50 p-4 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-ai-primary" />
+            <div className="h-2 w-2 rounded-full bg-ai-primary animate-pulse" />
             <span className="text-xs font-medium text-foreground/70">AI Analiz</span>
           </div>
           <span className="text-[10px] text-muted-foreground">az önce</span>
@@ -34,11 +90,10 @@ const features = [
           { label: "AL", color: "bg-gain/10 text-gain border-gain/20" },
           { label: "SAT", color: "bg-loss/10 text-loss border-loss/20" },
           { label: "TUT", color: "bg-muted text-muted-foreground border-border/20" },
-        ].map((signal, i) => (
+        ].map((signal) => (
           <div
             key={signal.label}
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${signal.color} animate-slide-up`}
-            style={{ animationDelay: `${i * 100}ms`, animationFillMode: "both" }}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold ${signal.color} transition-transform duration-200 hover:translate-x-1`}
           >
             {signal.label}
             <span className="text-muted-foreground font-normal">— THYAO</span>
@@ -115,7 +170,7 @@ const features = [
               { code: "ASELS", price: "₺58.90", change: "+1.12%", positive: true },
               { code: "TUPRS", price: "₺178.20", change: "-0.87%", positive: false },
             ].map((row) => (
-              <tr key={row.code} className="border-b border-border/5">
+              <tr key={row.code} className="border-b border-border/5 transition-colors hover:bg-foreground/[0.02]">
                 <td className="px-3 py-2 font-semibold text-foreground/80">{row.code}</td>
                 <td className="text-right px-3 py-2 text-muted-foreground">{row.price}</td>
                 <td className={`text-right px-3 py-2 font-medium ${row.positive ? "text-gain" : "text-loss"}`}>
@@ -156,9 +211,18 @@ const features = [
 ];
 
 export function FeaturesBento() {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const isHeaderInView = useInView(headerRef, { once: true, margin: "-10% 0px" });
+
   return (
     <section id="ozellikler" className="py-24 max-w-7xl mx-auto px-6">
-      <ScrollReveal className="text-center mb-16">
+      <motion.div
+        ref={headerRef}
+        className="text-center mb-16"
+        initial={{ opacity: 0, y: 30 }}
+        animate={isHeaderInView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         <p className="text-ai-primary text-sm font-medium tracking-wide uppercase mb-3">
           Özellikler
         </p>
@@ -169,27 +233,22 @@ export function FeaturesBento() {
           Yapay zeka destekli araçlarla BİST hisselerini analiz et, riskleri yönet,
           fırsatları yakala.
         </p>
-      </ScrollReveal>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
         {features.map((feature, i) => (
-          <ScrollReveal key={feature.title} delay={i * 80} className={feature.span}>
-            <div className="bento-card p-6 h-full group">
-              <div className="absolute inset-0 bg-gradient-to-br from-ai-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="h-9 w-9 rounded-lg bg-ai-primary/10 flex items-center justify-center">
-                    <feature.icon className="h-4 w-4 text-ai-primary" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-foreground">{feature.title}</h3>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-                {feature.visual}
+          <BentoCard key={feature.title} delay={i * 0.08} className={feature.span}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-9 w-9 rounded-lg bg-ai-primary/10 flex items-center justify-center group-hover:bg-ai-primary/15 transition-colors duration-300">
+                <feature.icon className="h-4 w-4 text-ai-primary" />
               </div>
+              <h3 className="text-sm font-semibold text-foreground">{feature.title}</h3>
             </div>
-          </ScrollReveal>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {feature.description}
+            </p>
+            {feature.visual}
+          </BentoCard>
         ))}
       </div>
     </section>

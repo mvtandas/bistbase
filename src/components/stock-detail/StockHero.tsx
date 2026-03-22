@@ -1,7 +1,10 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Plus, Check, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useAddStock, useRemoveStock } from "@/hooks/use-portfolio-mutations";
+import { QUERY_KEYS } from "@/lib/constants";
 import type { StockDetail, Period } from "./types";
 import { PERIOD_LABELS } from "./types";
 
@@ -12,15 +15,27 @@ interface StockHeroProps {
   setPeriod: (p: Period) => void;
   pdLoading: boolean;
   stockCode: string;
+  onStockAdded?: (code: string) => void;
 }
 
-export function StockHero({ data, activeData, period, setPeriod, pdLoading, stockCode }: StockHeroProps) {
+export function StockHero({ data, activeData, period, setPeriod, pdLoading, stockCode, onStockAdded }: StockHeroProps) {
   const d = activeData;
   const isPositive = (data.changePercent ?? 0) >= 0;
   const activeScore = period === "today" ? data.score : d?.score;
   const absoluteChange = data.price != null && data.changePercent != null
     ? (data.price * data.changePercent / (100 + data.changePercent))
     : null;
+
+  // Portfolio membership check
+  const { data: portfolioData } = useQuery<{ holdings?: { stockCode: string }[] }>({
+    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
+    queryFn: () => fetch("/api/portfolio-intelligence").then((r) => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+  const inPortfolio = portfolioData?.holdings?.some((h) => h.stockCode === stockCode) ?? false;
+  const addStock = useAddStock();
+  const removeStock = useRemoveStock();
+  const isMutating = addStock.isPending || removeStock.isPending;
 
   return (
     <div className="sticky top-0 z-20 bg-background -mx-4 md:-mx-6 px-4 md:px-6 -mt-6 md:-mt-8 pt-4 pb-3 mb-4 border-b border-border/30">
@@ -56,24 +71,53 @@ export function StockHero({ data, activeData, period, setPeriod, pdLoading, stoc
           </div>
         </div>
 
-        {/* Right: Score */}
-        {activeScore && (
-          <div className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border shrink-0",
-            activeScore.composite >= 70 ? "bg-gain/5 border-gain/15" :
-            activeScore.composite >= 45 ? "bg-amber-400/5 border-amber-400/15" :
-            "bg-loss/5 border-loss/15"
-          )}>
-            <span className={cn(
-              "text-lg font-extrabold tabular-nums leading-none",
-              activeScore.composite >= 70 ? "text-gain" :
-              activeScore.composite >= 45 ? "text-amber-400" : "text-loss"
+        {/* Right: Portfolio button + Score */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              if (inPortfolio) {
+                removeStock.mutate(stockCode);
+              } else {
+                addStock.mutate(stockCode, { onSuccess: () => onStockAdded?.(stockCode) });
+              }
+            }}
+            disabled={isMutating}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50",
+              inPortfolio
+                ? "bg-gain/10 text-gain border border-gain/20 hover:bg-loss/10 hover:text-loss hover:border-loss/20"
+                : "bg-ai-primary/10 text-ai-primary border border-ai-primary/20 hover:bg-ai-primary/20"
+            )}
+            title={inPortfolio ? "Portföyden çıkar" : "Portföye ekle"}
+          >
+            {isMutating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : inPortfolio ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">{inPortfolio ? "Portföyde" : "Portföye Ekle"}</span>
+          </button>
+
+          {activeScore && (
+            <div className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border",
+              activeScore.composite >= 70 ? "bg-gain/5 border-gain/15" :
+              activeScore.composite >= 45 ? "bg-amber-400/5 border-amber-400/15" :
+              "bg-loss/5 border-loss/15"
             )}>
-              {activeScore.composite}
-            </span>
-            <span className="text-[9px] font-medium text-muted-foreground/60 leading-tight">{activeScore.labelTr}</span>
-          </div>
-        )}
+              <span className={cn(
+                "text-lg font-extrabold tabular-nums leading-none",
+                activeScore.composite >= 70 ? "text-gain" :
+                activeScore.composite >= 45 ? "text-amber-400" : "text-loss"
+              )}>
+                {activeScore.composite}
+              </span>
+              <span className="text-[9px] font-medium text-muted-foreground/60 leading-tight">{activeScore.labelTr}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Row 2: Period tabs */}

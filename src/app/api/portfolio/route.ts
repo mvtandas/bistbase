@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { BETA_MODE, BIST_ALL } from "@/lib/constants";
+import { cacheDelPattern } from "@/lib/redis";
+
+/** Bust all Redis-cached portfolio data for a user */
+async function invalidatePortfolioCache(userId: string) {
+  await cacheDelPattern(`portfolio:${userId}:*`);
+}
 
 // GET: List user's portfolio
 export async function GET() {
@@ -82,6 +88,7 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  await invalidatePortfolioCache(session.user.id);
   return NextResponse.json(portfolio, { status: 201 });
 }
 
@@ -109,6 +116,7 @@ export async function DELETE(request: NextRequest) {
     },
   });
 
+  await invalidatePortfolioCache(session.user.id);
   return NextResponse.json({ success: true });
 }
 
@@ -139,5 +147,6 @@ export async function PATCH(request: NextRequest) {
     },
   });
 
+  await invalidatePortfolioCache(session.user.id);
   return NextResponse.json(updated);
 }

@@ -10,6 +10,7 @@ import Link from "next/link";
 import type { StockDetail, Summary, Period, ContentTab } from "@/components/stock-detail/types";
 import { PERIOD_LABELS } from "@/components/stock-detail/types";
 import { StockHero } from "@/components/stock-detail/StockHero";
+import { PortfolioEditModal } from "@/components/dashboard/portfolio-edit-modal";
 import { SummaryTab } from "@/components/stock-detail/SummaryTab";
 import { TechnicalTab } from "@/components/stock-detail/TechnicalTab";
 import { FundamentalTab } from "@/components/stock-detail/FundamentalTab";
@@ -39,6 +40,7 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
   const [tab, setTab] = useState<ContentTab>("summary");
   const [disclaimerShown, setDisclaimerShown] = useState(!aiDisclaimerAccepted);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(aiDisclaimerAccepted);
+  const [editStock, setEditStock] = useState<string | null>(null);
 
   // Main stock data
   const { data, isLoading, isError, error, refetch } = useQuery<StockDetail>({
@@ -171,6 +173,7 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
             setPeriod={setPeriod}
             pdLoading={pdLoading}
             stockCode={stockCode}
+            onStockAdded={(code) => setEditStock(code)}
           />
 
           {/* Price Chart */}
@@ -287,6 +290,14 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
       ) : null}
 
       <SpkDisclaimer />
+
+      {editStock && (
+        <PortfolioEditModal
+          stockCode={editStock}
+          mode="add"
+          onClose={() => setEditStock(null)}
+        />
+      )}
     </div>
   );
 }

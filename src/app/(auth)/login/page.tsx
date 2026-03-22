@@ -3,10 +3,11 @@ import { LoginForm } from "@/components/auth/login-form";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ verify?: string }>;
+  searchParams: Promise<{ verify?: string; email?: string }>;
 }) {
   const params = await searchParams;
   const isVerify = params.verify === "1";
+  const prefillEmail = params.email || "";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
@@ -45,7 +46,7 @@ export default async function LoginPage({
 
         {/* Form */}
         <div className="animate-[slideUp_0.6s_ease-out_0.1s_both]">
-          <LoginForm isVerify={isVerify} />
+          <LoginForm isVerify={isVerify} prefillEmail={prefillEmail} />
         </div>
 
         {/* Footer */}

@@ -283,4 +283,5 @@ export const QUERY_KEYS = {
   MARKET_SENTIMENT: ["market-sentiment"] as const,
   MARKET_OVERVIEW: ["market-overview"] as const,
   PORTFOLIO_NEWS: ["portfolio-news"] as const,
+  PORTFOLIO: ["portfolio"] as const,
 } as const;

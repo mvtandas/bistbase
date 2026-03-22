@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StockChip } from "./stock-chip";
 import { useStockSearch } from "@/hooks/use-stock-search";
 import { Search, ArrowRight, TrendingUp } from "lucide-react";
+import { PortfolioEditModal } from "@/components/dashboard/portfolio-edit-modal";
+import { toast } from "sonner";
 import type { StockSearchResult } from "@/types";
 
 const POPULAR_STOCKS: StockSearchResult[] = [
@@ -37,6 +39,7 @@ interface SelectedStock {
 export function StockSearch() {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<SelectedStock[]>([]);
+  const [editStock, setEditStock] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { results, loading } = useStockSearch(query);
   const router = useRouter();
@@ -57,22 +60,35 @@ export function StockSearch() {
       if (res.ok) {
         setSelected((prev) => [...prev, { code: stock.code, name: stock.name }]);
         setQuery("");
+        setEditStock(stock.code);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (data.error === "PREMIUM_REQUIRED") {
+          toast.error(data.message || "Ücretsiz planda maksimum 2 hisse ekleyebilirsiniz.");
+        } else {
+          toast.error("Hisse eklenirken bir hata oluştu.");
+        }
       }
     } catch {
-      // handle error
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     }
   }
 
   async function removeStock(code: string) {
     try {
-      await fetch("/api/portfolio", {
+      const res = await fetch("/api/portfolio", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stockCode: code }),
       });
-      setSelected((prev) => prev.filter((s) => s.code !== code));
+
+      if (res.ok) {
+        setSelected((prev) => prev.filter((s) => s.code !== code));
+      } else {
+        toast.error("Hisse çıkarılırken bir hata oluştu.");
+      }
     } catch {
-      // handle error
+      toast.error("Bağlantı hatası. Lütfen tekrar deneyin.");
     }
   }
 
@@ -186,6 +202,13 @@ export function StockSearch() {
         </Button>
       )}
 
+      {editStock && (
+        <PortfolioEditModal
+          stockCode={editStock}
+          mode="add"
+          onClose={() => setEditStock(null)}
+        />
+      )}
     </div>
   );
 }

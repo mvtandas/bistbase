@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "framer-motion";
+
 const stocks = [
   { code: "THYAO", price: "312.50", change: "+2.34", positive: true },
   { code: "ASELS", price: "58.90", change: "+1.12", positive: true },
@@ -15,11 +19,18 @@ const stocks = [
 
 function TickerItem({ code, price, change, positive }: (typeof stocks)[number]) {
   return (
-    <div className="flex items-center gap-3 px-6">
-      <span className="text-sm font-semibold text-foreground/80">{code}</span>
+    <div className="flex items-center gap-3 px-6 group/ticker">
+      <span className="text-sm font-semibold text-foreground/80 group-hover/ticker:text-foreground transition-colors">
+        {code}
+      </span>
       <span className="text-sm font-mono text-muted-foreground">₺{price}</span>
-      <span className={`text-xs font-mono font-medium ${positive ? "text-gain" : "text-loss"}`}>
-        {positive ? "+" : ""}{change}%
+      <span
+        className={`text-xs font-mono font-medium ${
+          positive ? "text-gain" : "text-loss"
+        }`}
+      >
+        {positive ? "+" : ""}
+        {change}%
       </span>
     </div>
   );
@@ -27,16 +38,24 @@ function TickerItem({ code, price, change, positive }: (typeof stocks)[number]) 
 
 export function StockTicker() {
   return (
-    <div className="border-y border-border/20 bg-card/10 py-4 overflow-hidden">
+    <motion.div
+      className="border-y border-border/20 bg-card/10 py-4 overflow-hidden relative"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6, delay: 0.5 }}
+    >
+      {/* Fade edges */}
+      <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+
       <div
         className="flex whitespace-nowrap"
         style={{ animation: "ticker 40s linear infinite" }}
       >
-        {/* Double the content for seamless loop */}
         {[...stocks, ...stocks].map((stock, i) => (
           <TickerItem key={`${stock.code}-${i}`} {...stock} />
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 }

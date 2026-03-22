@@ -8,10 +8,14 @@ import { LiveDemo } from "@/components/landing/live-demo";
 import { Testimonials } from "@/components/landing/testimonials";
 import { FinalCta } from "@/components/landing/final-cta";
 import { LandingFooter } from "@/components/landing/landing-footer";
+import { CursorGlow } from "@/components/landing/cursor-glow";
+import { ScrollProgress } from "@/components/landing/scroll-progress";
 
 export default function LandingPage() {
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen noise-overlay">
+      <ScrollProgress />
+      <CursorGlow />
       <Navbar />
       <main>
         <HeroSection />

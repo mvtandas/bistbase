@@ -5,8 +5,8 @@ import { signIn } from "next-auth/react";
 import { Mail, ArrowRight, ShieldCheck, ArrowLeft, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function LoginForm({ isVerify }: { isVerify: boolean }) {
-  const [email, setEmail] = useState("");
+export function LoginForm({ isVerify, prefillEmail = "" }: { isVerify: boolean; prefillEmail?: string }) {
+  const [email, setEmail] = useState(prefillEmail);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<"email" | "otp">(isVerify ? "otp" : "email");

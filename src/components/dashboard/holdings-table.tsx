@@ -3,10 +3,11 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { ArrowUpDown, TrendingUp, TrendingDown, Minus, Pencil, Search, ChevronDown } from "lucide-react";
+import { ArrowUpDown, TrendingUp, TrendingDown, Minus, Pencil, Trash2, Plus, Search, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QUERY_KEYS } from "@/lib/constants";
 import { Sparkline } from "./sparkline";
+import { HoldingsEmptyState } from "./holdings-empty-state";
 import Link from "next/link";
 import type { PortfolioIntelligence } from "@/lib/stock/portfolio-intelligence";
 
@@ -33,9 +34,11 @@ function SortHeader({ label, sortKey, currentSort, onSort }: { label: string; so
 
 interface HoldingsTableProps {
   onEdit?: (stockCode: string) => void;
+  onAdd?: () => void;
+  onRemove?: (stockCode: string) => void;
 }
 
-export function HoldingsTable({ onEdit }: HoldingsTableProps) {
+export function HoldingsTable({ onEdit, onAdd, onRemove }: HoldingsTableProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, isLoading, isError } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
@@ -68,12 +71,7 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
   }
 
   if (!data?.holdings?.length) {
-    return (
-      <div className="bento-card p-8 text-center">
-        <p className="text-sm text-muted-foreground">Portföyünüzde henüz hisse bulunmuyor.</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">Keşfet sayfasından hisse ekleyebilirsiniz.</p>
-      </div>
-    );
+    return <HoldingsEmptyState onAdd={() => onAdd?.()} />;
   }
 
   const hasPosition = data.hasPositionData;
@@ -113,6 +111,16 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
             />
           </div>
           <span className="text-xs text-muted-foreground/50">{data.holdings.length} hisse</span>
+          {onAdd && (
+            <button
+              onClick={onAdd}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-ai-primary/10 text-ai-primary px-3 py-1.5 text-xs font-medium hover:bg-ai-primary/20 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Hisse Ekle</span>
+              <kbd className="hidden sm:inline-flex ml-0.5 px-1 py-0.5 rounded bg-ai-primary/10 text-[9px] font-mono">⌘K</kbd>
+            </button>
+          )}
         </div>
       </div>
 
@@ -198,8 +206,13 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
                     )}
                     <td className="px-3 py-3 flex items-center gap-1">
                       {onEdit && (
-                        <button onClick={(e) => { e.stopPropagation(); onEdit(h.stockCode); }} className="p-1.5 rounded-lg hover:bg-card/50 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); onEdit(h.stockCode); }} className="p-1.5 rounded-lg hover:bg-card/50 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors" title="Düzenle">
                           <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {onRemove && (
+                        <button onClick={(e) => { e.stopPropagation(); onRemove(h.stockCode); }} className="p-1.5 rounded-lg hover:bg-loss/10 text-muted-foreground/30 hover:text-loss transition-colors" title="Çıkar">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}
                       <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground/30 transition-transform", isExpanded && "rotate-180")} />
