@@ -114,52 +114,48 @@ export function ScreenerClient() {
       )}
 
       {/* Index Tabs + Last Update */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Endeksler */}
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest font-medium mr-1">Endeksler</span>
-            <div className="flex items-center gap-1 rounded-lg bg-card/50 border border-border/30 p-1">
-              {INDEX_TABS.filter(t => t.group === "index").map(tab => (
-                <button
-                  key={tab.value}
-                  onClick={() => setIndex(tab.value)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
-                    index === tab.value
-                      ? "bg-ai-primary/15 text-ai-primary shadow-sm"
-                      : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+      <div className="space-y-3">
+        {/* Tek satır scrollable tab bar */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none -mx-1 px-1 pb-1">
+          <div className="flex items-center gap-1 rounded-lg bg-card/50 border border-border/30 p-1 shrink-0">
+            {INDEX_TABS.filter(t => t.group === "index").map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => setIndex(tab.value)}
+                className={cn(
+                  "px-2.5 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap",
+                  index === tab.value
+                    ? "bg-ai-primary/15 text-ai-primary shadow-sm"
+                    : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          {/* Tematik */}
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground/40 uppercase tracking-widest font-medium mr-1">Tematik</span>
-            <div className="flex items-center gap-1 rounded-lg bg-card/50 border border-border/30 p-1">
-              {INDEX_TABS.filter(t => t.group === "thematic").map(tab => (
-                <button
-                  key={tab.value}
-                  onClick={() => setIndex(tab.value)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
-                    index === tab.value
-                      ? "bg-ai-primary/15 text-ai-primary shadow-sm"
-                      : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card"
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+
+          <div className="w-px h-5 bg-border/20 shrink-0 hidden sm:block" />
+
+          <div className="flex items-center gap-1 rounded-lg bg-card/50 border border-border/30 p-1 shrink-0">
+            {INDEX_TABS.filter(t => t.group === "thematic").map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => setIndex(tab.value)}
+                className={cn(
+                  "px-2.5 sm:px-3 py-1.5 rounded-md text-[11px] sm:text-xs font-medium transition-all whitespace-nowrap",
+                  index === tab.value
+                    ? "bg-ai-premium/15 text-ai-premium shadow-sm"
+                    : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-card"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
 
         {generatedAt && (
-          <p className="text-[11px] text-muted-foreground/50">
+          <p className="text-[11px] text-muted-foreground/40">
             Son güncelleme: {generatedAt.toLocaleDateString("tr-TR")} {generatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
             {isRefetching && " · Yükleniyor..."}
           </p>
