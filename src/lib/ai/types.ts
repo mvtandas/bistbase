@@ -60,6 +60,12 @@ export type InsightType =
   | "sektor-analiz"
   | "islem-kurulumu";
 
+export type PortfolioInsightType =
+  | "portfoy-ozet"
+  | "portfoy-risk"
+  | "portfoy-rebalans"
+  | "portfoy-performans";
+
 export interface AkilliOzetOutput {
   tldr: string;
   bullets: { icon: string; text: string; category: "technical" | "fundamental" | "macro" | "risk" }[];
@@ -120,4 +126,36 @@ export interface IslemKurulumuOutput {
   timeframe: string;
   confluenceScore: number;
   status: "ACTIVE" | "PENDING" | "EXPIRED";
+}
+
+// ---- Portfolio AI Insight Types ----
+
+export interface PortfoyOzetOutput {
+  tldr: string;
+  bullets: { icon: string; text: string; category: "allocation" | "performance" | "risk" | "action" }[];
+  healthAnalysis: string;
+  topPriority: string;
+  watchlist: string[];
+}
+
+export interface PortfoyRiskOutput {
+  riskSummary: string;
+  scenarios: { title: string; probability: "LOW" | "MEDIUM" | "HIGH"; impact: string; estimatedLoss: string; hedgeSuggestion: string }[];
+  drawdownAnalysis: string;
+  correlationWarning: string;
+  riskAppetiteAdvice: string;
+}
+
+export interface PortfoyRebalansOutput {
+  currentAssessment: string;
+  actions: { stockCode: string; action: "ARTIR" | "AZALT" | "TUT" | "CIKAR"; reasoning: string; targetWeight: string }[];
+  sectorAdvice: string;
+  diversificationAdvice: string;
+}
+
+export interface PortfoyPerformansOutput {
+  performanceSummary: string;
+  drivers: { stockCode: string; contribution: string; explanation: string }[];
+  benchmarkComparison: string;
+  outlook: string;
 }

@@ -14,10 +14,13 @@ import { MonteCarloChart } from "./monte-carlo-chart";
 import { StressTestCard } from "./stress-test-card";
 import { CorrelationHeatmap } from "./correlation-heatmap";
 import { WhatIfPanel } from "./what-if-panel";
-import { PortfolioNarrative } from "./portfolio-narrative";
 import { PortfolioRiskCard } from "./portfolio-risk-card";
 import { SectorRotationCard } from "./sector-rotation-card";
 import { RebalanceSuggestions } from "./rebalance-suggestions";
+import { PortfolioOzetCard } from "./ai/portfolio-ozet-card";
+import { PortfolioPerformansCard } from "./ai/portfolio-performans-card";
+import { PortfolioRiskAiCard } from "./ai/portfolio-risk-ai-card";
+import { PortfolioRebalansCard } from "./ai/portfolio-rebalans-card";
 
 type Tab = "allocation" | "risk" | "tools";
 
@@ -54,16 +57,19 @@ export function DashboardTabs() {
       {/* Tab Content */}
       {active === "allocation" && (
         <div className="space-y-6 animate-fade-in">
+          <PortfolioOzetCard enabled={active === "allocation"} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AllocationChart />
             <PortfolioBenchmark />
           </div>
+          <PortfolioPerformansCard enabled={active === "allocation"} />
           <PerformanceCalendar />
         </div>
       )}
 
       {active === "risk" && (
         <div className="space-y-6 animate-fade-in">
+          <PortfolioRiskAiCard enabled={active === "risk"} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <RiskMetricsSummary />
             <RiskContribution />
@@ -82,6 +88,7 @@ export function DashboardTabs() {
 
       {active === "tools" && (
         <div className="space-y-6 animate-fade-in">
+          <PortfolioRebalansCard enabled={active === "tools"} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <WhatIfPanel />
             <RebalanceSuggestions />
@@ -90,7 +97,6 @@ export function DashboardTabs() {
             <PortfolioRiskCard />
             <SectorRotationCard />
           </div>
-          <PortfolioNarrative />
         </div>
       )}
     </div>

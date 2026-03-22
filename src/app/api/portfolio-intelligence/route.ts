@@ -21,7 +21,6 @@ import { calculatePortfolioEquityCurve } from "@/lib/stock/portfolio-equity";
 import { calculateExtendedRiskMetrics } from "@/lib/stock/portfolio-risk-extended";
 import { calculatePortfolioHealthScore } from "@/lib/stock/portfolio-health";
 import { runMonteCarloSimulation } from "@/lib/stock/monte-carlo";
-import { generatePortfolioNarrative } from "@/lib/stock/portfolio-narrative";
 import { calculateStressTest } from "@/lib/stock/stress-test";
 import { cacheGet, cacheSet } from "@/lib/redis";
 
@@ -229,29 +228,6 @@ export async function GET(req: NextRequest) {
       }))
     );
 
-    // ═══ AI Narrative (premium only, non-blocking) ═══
-    let narrative: string | null = null;
-    try {
-      narrative = await generatePortfolioNarrative({
-        totalValue: result.metrics.totalValue,
-        totalPnL: result.metrics.totalPnL,
-        totalPnLPercent: result.metrics.totalPnLPercent,
-        dailyChange: result.metrics.dailyChange,
-        verdictAction: result.portfolioVerdict.action,
-        verdictConfidence: result.portfolioVerdict.confidence,
-        compositeScore: result.portfolioCompositeScore,
-        holdingCount: result.holdings.length,
-        alpha: benchmarkComparison.length > 0 ? benchmarkComparison[0].alpha : null,
-        sharpeRatio: extendedRiskMetrics?.sharpeRatio ?? null,
-        diversificationScore: portfolioRisk?.diversificationScore ?? 50,
-        healthGrade: healthScore.grade,
-        strongestHolding: result.strongestHolding,
-        weakestHolding: result.weakestHolding,
-        suggestions: result.suggestions,
-        maxDrawdown: drawdown?.maxDrawdown ?? null,
-      }, userId);
-    } catch { /* narrative generation failed, non-critical */ }
-
     // ═══ Sparkline Data (her hisse için son 7 gün fiyatları) ═══
     const sparklineData: Record<string, number[]> = {};
     await Promise.all(
@@ -282,7 +258,6 @@ export async function GET(req: NextRequest) {
       healthScore,
       monteCarlo,
       stressTest,
-      narrative,
       sparklineData,
     };
 

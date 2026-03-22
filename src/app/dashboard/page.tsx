@@ -14,7 +14,6 @@ import { MarketSentiment } from "@/components/dashboard/market-sentiment";
 import { MarketBreadth } from "@/components/dashboard/market-breadth";
 import { NewsFeed } from "@/components/dashboard/news-feed";
 import { DashboardClient } from "./dashboard-client";
-import type { DailySummaryData } from "@/types";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -27,40 +26,6 @@ export default async function DashboardPage() {
   });
 
   const stockCodes = portfolios.map((p) => p.stockCode);
-
-  const today = new Date();
-  const todayDate = new Date(
-    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  );
-
-  let summaries = await prisma.dailySummary.findMany({
-    where: { stockCode: { in: stockCodes }, date: todayDate },
-  });
-
-  if (summaries.length === 0 && stockCodes.length > 0) {
-    const sevenDaysAgo = new Date(todayDate);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentSummaries = await prisma.dailySummary.findMany({
-      where: { stockCode: { in: stockCodes }, date: { gte: sevenDaysAgo }, status: "COMPLETED" },
-      orderBy: { date: "desc" },
-    });
-    const seen = new Set<string>();
-    for (const s of recentSummaries) {
-      if (!seen.has(s.stockCode)) { summaries.push(s); seen.add(s.stockCode); }
-    }
-  }
-
-  const initialSummaries: Record<string, DailySummaryData> = {};
-  for (const s of summaries) {
-    initialSummaries[s.stockCode] = {
-      id: s.id, stockCode: s.stockCode, date: s.date.toISOString(),
-      closePrice: s.closePrice, changePercent: s.changePercent,
-      aiSummaryText: s.aiSummaryText, sentimentScore: s.sentimentScore,
-      status: s.status, compositeScore: s.compositeScore,
-      bullCase: s.bullCase, bearCase: s.bearCase, confidence: s.confidence,
-    };
-  }
-
   const hasPortfolio = stockCodes.length > 0;
 
   return (
@@ -136,7 +101,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <DailyFeed stockCodes={stockCodes} initialSummaries={initialSummaries} />
+      <DailyFeed stockCodes={stockCodes} initialSummaries={{}} />
     </div>
   );
 }
