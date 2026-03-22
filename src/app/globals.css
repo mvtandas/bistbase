@@ -262,3 +262,57 @@ html { scroll-behavior: smooth; }
 .bento-card-subtitle {
   @apply text-xs text-muted-foreground/70 ml-auto;
 }
+
+/* ═══ Onboarding Walkthrough Animations ═══ */
+
+@keyframes stepEnter {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes stepExit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-10px) scale(0.98); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(1deg); }
+}
+
+@keyframes morphBlob {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50% { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; }
+  75% { border-radius: 60% 40% 60% 30% / 60% 40% 30% 60%; }
+}
+
+@keyframes drawLine {
+  from { stroke-dashoffset: 300; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes progressExpand {
+  from { width: 0.5rem; }
+  to { width: 2.5rem; }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes blinkCaret {
+  50% { border-color: transparent; }
+}
+
+.animate-step-enter { animation: stepEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-float-slow { animation: floatSlow 4s ease-in-out infinite; }
+.animate-morph-blob { animation: morphBlob 8s ease-in-out infinite; }
+.animate-draw-line { animation: drawLine 1.5s ease-out forwards; }
+.animate-sparkle { animation: sparkle 2s ease-in-out infinite; }

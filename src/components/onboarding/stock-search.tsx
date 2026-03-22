@@ -103,6 +103,19 @@ export function StockSearch() {
 
   return (
     <div className="w-full max-w-lg mx-auto space-y-6">
+      {/* Step header */}
+      <div className="text-center space-y-3 mb-2">
+        <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
+          Hisselerinizi
+          <br />
+          <span className="text-gain">Seçin</span>
+        </h1>
+        <p className="text-muted-foreground text-base leading-relaxed">
+          Portföyünüze eklemek istediğiniz BİST hisselerini arayın ve seçin.
+          <span className="text-foreground font-medium"> AI analizleri hemen başlasın.</span>
+        </p>
+      </div>
+
       {/* Selected stocks */}
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -166,7 +179,7 @@ export function StockSearch() {
         <Button
           onClick={handleContinue}
           disabled={saving}
-          className="w-full h-12 bg-ai-primary hover:bg-ai-primary/90 text-white"
+          className="w-full h-12 bg-gradient-to-r from-ai-primary to-ai-premium hover:from-ai-primary/90 hover:to-ai-premium/90 text-white shadow-lg shadow-ai-primary/20 transition-all hover:shadow-xl hover:shadow-ai-primary/30 hover:scale-[1.02] active:scale-[0.98]"
         >
           {saving ? "Yönlendiriliyor..." : "Devam Et"}
           {!saving && <ArrowRight className="ml-2 h-4 w-4" />}
