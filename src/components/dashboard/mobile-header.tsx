@@ -23,7 +23,7 @@ export function MobileHeader({
     <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 md:hidden">
       <Logo />
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger>
+        <SheetTrigger className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
           <Menu className="h-5 w-5" />
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-72">

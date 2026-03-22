@@ -70,10 +70,8 @@ export function Navbar() {
         {/* Mobile menu */}
         <div className="md:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger>
-              <Button variant="ghost" size="icon-sm">
-                <Menu className="h-5 w-5" />
-              </Button>
+            <SheetTrigger className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <Menu className="h-5 w-5" />
             </SheetTrigger>
             <SheetContent side="right" className="w-72">
               <SheetHeader>
