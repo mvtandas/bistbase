@@ -71,38 +71,13 @@ export function LoginForm({ isVerify }: { isVerify: boolean }) {
     setLoading(true);
     setError("");
 
-    try {
-      const callbackUrl = "/onboarding";
-      // NextAuth email provider: verify OTP by calling the callback URL with the token
-      const params = new URLSearchParams({
-        callbackUrl,
-        token: code,
-        email,
-      });
-      const res = await fetch(`/api/auth/callback/email?${params.toString()}`, {
-        method: "GET",
-        redirect: "follow",
-      });
-
-      if (res.redirected) {
-        window.location.href = res.url;
-        return;
-      }
-
-      if (res.ok) {
-        window.location.href = callbackUrl;
-      } else {
-        setError("Geçersiz veya süresi dolmuş kod. Tekrar deneyin.");
-        setOtp(["", "", "", "", "", ""]);
-        inputRefs.current[0]?.focus();
-      }
-    } catch {
-      setError("Doğrulama başarısız. Tekrar deneyin.");
-      setOtp(["", "", "", "", "", ""]);
-      inputRefs.current[0]?.focus();
-    } finally {
-      setLoading(false);
-    }
+    // NextAuth email callback — tarayıcı doğrudan yönlendirilmeli (cookie'ler için)
+    const params = new URLSearchParams({
+      callbackUrl: "/onboarding",
+      token: code,
+      email,
+    });
+    window.location.href = `/api/auth/callback/email?${params.toString()}`;
   }
 
   if (step === "otp") {
