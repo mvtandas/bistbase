@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 const resend = new Resend(process.env.EMAIL_SERVER_PASSWORD);
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [
     Email({
