@@ -59,7 +59,7 @@ function FanChart({ projections }: { projections: { date: string; p5: number; p2
 
 export function MonteCarloChart() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
@@ -73,6 +73,8 @@ export function MonteCarloChart() {
       </div>
     );
   }
+
+  if (isError || !data) return null;
 
   const mc = data?.monteCarlo;
   if (!mc || mc.projections.length < 3) return null;

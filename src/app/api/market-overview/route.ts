@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
+import { rateLimit } from "@/lib/rate-limit";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({
@@ -35,7 +36,13 @@ const TOP_STOCKS = [
   "SASA.IS", "PETKM.IS", "TCELL.IS", "HEKTS.IS", "KOZAL.IS",
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "anonymous";
+  const { success } = rateLimit(`market-overview:${ip}`, 20, 60_000);
+  if (!success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     // Fetch indices
     const indices = await Promise.all(

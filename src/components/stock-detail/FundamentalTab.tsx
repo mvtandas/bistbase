@@ -67,7 +67,7 @@ export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoadin
           )}
 
           {/* Ratio grid */}
-          <div className="grid grid-cols-3 gap-x-6 gap-y-3 text-[11px]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-3 text-[11px]">
             <div><div className="flex items-center gap-1"><span className="text-muted-foreground/60">F/K</span><InfoTooltip title="Fiyat/Kazanç Oranı" description="Hisse fiyatının hisse başı kâra oranı. Düşük F/K ucuzluğa, yüksek F/K büyüme primine işaret edebilir." thresholds={["<10: Ucuz", "10-20: Makul", ">20: Pahalı"]} /></div><span className="font-medium">{fmt(d.financials.peRatio, 1)}</span><p className="text-[9px] text-muted-foreground/40 italic">{I.interpretPE(d.financials.peRatio as number)}</p></div>
             <div><div className="flex items-center gap-1"><span className="text-muted-foreground/60">PD/DD</span><InfoTooltip title="Piyasa Değeri / Defter Değeri" description="Şirketin piyasa değerinin muhasebe defter değerine oranı. 1 altı varlıklarından ucuz demek." /></div><span className="font-medium">{fmt(d.financials.pbRatio)}</span></div>
             <div><div className="flex items-center gap-1"><span className="text-muted-foreground/60">FD/FAVÖK</span><InfoTooltip title="Firma Değeri / FAVÖK" description="Borç dahil toplam değerin faiz-amortisman öncesi kâra oranı. Sektörler arası en güvenilir değerleme metriği." /></div><span className="font-medium">{fmt(d.financials.evToEbitda, 1)}</span></div>
@@ -94,7 +94,7 @@ export function FundamentalTab({ d, stockCode, timeLabel, sektorAnaliz, saLoadin
       {d.macroData && (
         <div className="rounded-xl border border-border/40 bg-card/30 p-4">
           <SectionHeader icon={Globe} label={`Makro Ortam — ${d.macroData.macroLabel}`} subtitle="Hisseyi etkileyen makroekonomik koşullar — döviz, endeks ve küresel risk iştahı." tooltip="Piyasanın genel yönünü belirleyen makro faktörler. Makro olumsuzken teknik sinyaller genelde zayıf çalışır." timeLabel={timeLabel} />
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div>
               <p className="text-[9px] text-muted-foreground/50 flex items-center justify-center gap-1">USD/TRY <InfoTooltip title="Dolar/TL Kuru" description="TL zayıflaması ihracatçıları destekler, ithalatçıları ve borçluları baskılar." /></p>
               <p className="text-sm font-bold text-foreground">₺{fmt(d.macroData.usdTry)}</p>

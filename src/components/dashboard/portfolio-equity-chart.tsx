@@ -14,7 +14,7 @@ export function PortfolioEquityChart() {
   const [range, setRange] = useState<Range>("6M");
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
@@ -28,6 +28,8 @@ export function PortfolioEquityChart() {
       </div>
     );
   }
+
+  if (isError || !data) return null;
 
   const curve = data?.equityCurve ?? [];
   if (curve.length < 5) return null;

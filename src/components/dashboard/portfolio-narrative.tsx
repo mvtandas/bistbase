@@ -7,7 +7,7 @@ import { QUERY_KEYS } from "@/lib/constants";
 
 export function PortfolioNarrative() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading, refetch, isFetching } = useQuery<any>({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
@@ -21,6 +21,8 @@ export function PortfolioNarrative() {
       </div>
     );
   }
+
+  if (isError || !data) return null;
 
   const narrative = data?.narrative;
   if (!narrative) return null;

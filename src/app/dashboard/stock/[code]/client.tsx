@@ -216,7 +216,7 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
                       )}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span>{t.label}</span>
+                      <span className="hidden min-[480px]:inline">{t.label}</span>
                     </button>
                   );
                 })}

@@ -41,7 +41,7 @@ function formatValue(value: number | null, format: string): string {
 }
 
 export function MacroIndicators() {
-  const { data, isLoading } = useQuery<MacroData>({
+  const { data, isLoading, isError } = useQuery<MacroData>({
     queryKey: ["macro"],
     queryFn: () => fetch("/api/macro").then((r) => r.json()),
     staleTime: 10 * 60 * 1000,
@@ -52,7 +52,7 @@ export function MacroIndicators() {
     return (
       <div className="bento-card">
         <div className="bento-card-header"><Skeleton className="h-4 w-36" /></div>
-        <div className="bento-card-body grid grid-cols-3 gap-3">
+        <div className="bento-card-body grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Skeleton key={i} className="h-14 rounded-xl" />
           ))}
@@ -61,7 +61,7 @@ export function MacroIndicators() {
     );
   }
 
-  if (!data) return null;
+  if (isError || !data) return null;
 
   const scoreColor =
     data.macroScore >= 65 ? "bg-gain/10 text-gain" :
@@ -78,7 +78,7 @@ export function MacroIndicators() {
         </span>
       </div>
       <div className="bento-card-body">
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {INDICATORS.map((ind) => {
             const value = data[ind.key as keyof MacroData] as number | null;
             const change = data[ind.changeKey as keyof MacroData] as number | null;

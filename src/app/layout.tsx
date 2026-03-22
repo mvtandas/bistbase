@@ -16,9 +16,44 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bistbase — Borsanın gürültüsünü kapat, sinyali yakala",
+  title: {
+    default: "Bistbase — Borsanın gürültüsünü kapat, sinyali yakala",
+    template: "%s | Bistbase",
+  },
   description:
     "BİST hisseleri için yapay zeka destekli günlük analiz ve portföy takip platformu.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://bistbase.com"
+  ),
+  keywords: [
+    "borsa istanbul",
+    "bist analiz",
+    "hisse analiz",
+    "yapay zeka borsa",
+    "portföy takip",
+    "teknik analiz",
+    "bistbase",
+  ],
+  authors: [{ name: "Bistbase" }],
+  creator: "Bistbase",
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    siteName: "Bistbase",
+    title: "Bistbase — Borsanın gürültüsünü kapat, sinyali yakala",
+    description:
+      "BİST hisseleri için yapay zeka destekli günlük analiz ve portföy takip platformu.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bistbase — Borsanın gürültüsünü kapat, sinyali yakala",
+    description:
+      "BİST hisseleri için yapay zeka destekli günlük analiz ve portföy takip platformu.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

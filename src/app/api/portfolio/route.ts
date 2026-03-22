@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { BETA_MODE } from "@/lib/constants";
+import { BETA_MODE, BIST_ALL } from "@/lib/constants";
 
 // GET: List user's portfolio
 export async function GET() {
@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
   }
 
   const code = stockCode.replace(".IS", "").toUpperCase();
+
+  if (!BIST_ALL.includes(code)) {
+    return NextResponse.json(
+      { error: "Geçersiz hisse kodu" },
+      { status: 400 }
+    );
+  }
 
   // Check FREE plan limit (max 2 stocks) - disabled in beta
   if (!BETA_MODE) {

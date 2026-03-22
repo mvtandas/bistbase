@@ -47,7 +47,7 @@ export function RiskTab({ d, timeLabel, riskSenaryo, rsLoading, rsError }: RiskT
         </div>
 
         {/* Key risk metrics with MetricCard */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <MetricCard
             label="Sharpe Oranı"
             subtitle="Risk-Getiri Kalitesi"

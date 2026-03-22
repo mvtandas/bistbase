@@ -37,7 +37,7 @@ interface HoldingsTableProps {
 
 export function HoldingsTable({ onEdit }: HoldingsTableProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
@@ -59,7 +59,22 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
     );
   }
 
-  if (!data?.holdings?.length) return null;
+  if (isError) {
+    return (
+      <div className="bento-card p-8 text-center">
+        <p className="text-sm text-muted-foreground">Portföy verileri yüklenemedi.</p>
+      </div>
+    );
+  }
+
+  if (!data?.holdings?.length) {
+    return (
+      <div className="bento-card p-8 text-center">
+        <p className="text-sm text-muted-foreground">Portföyünüzde henüz hisse bulunmuyor.</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Keşfet sayfasından hisse ekleyebilirsiniz.</p>
+      </div>
+    );
+  }
 
   const hasPosition = data.hasPositionData;
   const sparklineData: Record<string, number[]> = data.sparklineData ?? {};
@@ -107,12 +122,12 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
           <thead>
             <tr className="border-b border-border/15">
               <th className="text-left px-5 py-2.5 text-[11px] text-muted-foreground/60 font-medium uppercase tracking-wider">Hisse</th>
-              <th className="px-2 py-2.5 w-16">Grafik</th>
+              <th className="px-2 py-2.5 w-16 hidden sm:table-cell">Grafik</th>
               <th className="text-right px-3 py-2.5"><SortHeader label="Değişim" sortKey="changePercent" currentSort={sort} onSort={onSort} /></th>
               <th className="text-right px-3 py-2.5"><SortHeader label="Skor" sortKey="compositeScore" currentSort={sort} onSort={onSort} /></th>
               <th className="text-center px-3 py-2.5"><SortHeader label="Karar" sortKey="verdictScore" currentSort={sort} onSort={onSort} /></th>
-              <th className="text-right px-3 py-2.5"><SortHeader label="Ağırlık" sortKey="weight" currentSort={sort} onSort={onSort} /></th>
-              {hasPosition && <th className="text-right px-3 py-2.5"><SortHeader label="K/Z" sortKey="pnlPercent" currentSort={sort} onSort={onSort} /></th>}
+              <th className="text-right px-3 py-2.5 hidden sm:table-cell"><SortHeader label="Ağırlık" sortKey="weight" currentSort={sort} onSort={onSort} /></th>
+              {hasPosition && <th className="text-right px-3 py-2.5 hidden sm:table-cell"><SortHeader label="K/Z" sortKey="pnlPercent" currentSort={sort} onSort={onSort} /></th>}
               <th className="w-16" />
             </tr>
           </thead>
@@ -135,7 +150,7 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
                         {h.price != null && <span className="text-muted-foreground/60 ml-2 tabular-nums">₺{h.price.toFixed(2)}</span>}
                       </Link>
                     </td>
-                    <td className="px-2 py-3">
+                    <td className="px-2 py-3 hidden sm:table-cell">
                       {sparkData.length > 1 && <Sparkline data={sparkData} width={60} height={28} />}
                     </td>
                     <td className="text-right px-3 py-3 tabular-nums">
@@ -160,11 +175,11 @@ export function HoldingsTable({ onEdit }: HoldingsTableProps) {
                         </span>
                       )}
                     </td>
-                    <td className="text-right px-3 py-3 tabular-nums text-muted-foreground/70">
+                    <td className="text-right px-3 py-3 tabular-nums text-muted-foreground/70 hidden sm:table-cell">
                       %{h.weight}
                     </td>
                     {hasPosition && (
-                      <td className="text-right px-3 py-3 tabular-nums">
+                      <td className="text-right px-3 py-3 tabular-nums hidden sm:table-cell">
                         {h.pnl != null ? (
                           <div>
                             <span className={cn("font-semibold", h.pnl >= 0 ? "text-gain" : "text-loss")}>

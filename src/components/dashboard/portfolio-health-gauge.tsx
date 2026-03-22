@@ -46,7 +46,7 @@ function GaugeArc({ score }: { score: number }) {
 
 export function PortfolioHealthGauge() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
@@ -60,6 +60,8 @@ export function PortfolioHealthGauge() {
       </div>
     );
   }
+
+  if (isError || !data) return null;
 
   const health = data?.healthScore;
   if (!health) return null;
