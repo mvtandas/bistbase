@@ -8,7 +8,7 @@ import { calculateSectorContext } from "@/lib/stock/sectors";
 import { generateSpecializedInsight } from "@/lib/ai/specialized";
 import { buildRiskSenaryoPrompt } from "@/lib/ai/specialized-prompts";
 import type { RiskSenaryoOutput } from "@/lib/ai/types";
-import { prisma } from "@/lib/prisma";
+import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
@@ -45,11 +45,9 @@ export async function GET(
   const todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
 
   try {
-    const existing = await prisma.aiInsight.findUnique({
-      where: { stockCode_date_insightType_timeframe: { stockCode, date: todayUTC, insightType, timeframe: "daily" } },
-    });
-    if (existing?.status === "COMPLETED") {
-      return NextResponse.json({ cached: true, data: existing.resultJson });
+    const cached = await getCachedInsight(stockCode, insightType, todayUTC);
+    if (cached) {
+      return NextResponse.json({ cached: true, data: cached.data });
     }
 
     const [bars, quote, fundamentalData, macroData] = await Promise.all([
@@ -78,11 +76,7 @@ export async function GET(
       return NextResponse.json({ error: "AI analizi uretilemedi" }, { status: 500 });
     }
 
-    await prisma.aiInsight.upsert({
-      where: { stockCode_date_insightType_timeframe: { stockCode, date: todayUTC, insightType, timeframe: "daily" } },
-      create: { stockCode, date: todayUTC, insightType, timeframe: "daily", resultJson: result as object, status: "COMPLETED" },
-      update: { resultJson: result as object, status: "COMPLETED" },
-    });
+    await saveInsight(stockCode, insightType, todayUTC, result as object);
 
     return NextResponse.json({ cached: false, data: result });
   } catch (error) {

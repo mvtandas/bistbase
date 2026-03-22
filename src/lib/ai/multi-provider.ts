@@ -82,6 +82,8 @@ export interface LLMCallOptions {
 export interface LLMCallResult {
   content: string;
   provider: string;
+  promptTokens?: number;
+  completionTokens?: number;
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -164,7 +166,18 @@ export async function callLLM(
           break; // Try next provider
         }
 
-        return { content, provider: provider.name };
+        // Track token usage
+        const usage = data.usage;
+        if (usage) {
+          console.log(`[multi-provider] ${provider.name} tokens: prompt=${usage.prompt_tokens ?? "?"}, completion=${usage.completion_tokens ?? "?"}, total=${usage.total_tokens ?? "?"}`);
+        }
+
+        return {
+          content,
+          provider: provider.name,
+          promptTokens: usage?.prompt_tokens,
+          completionTokens: usage?.completion_tokens,
+        };
       } catch (error) {
         console.error(`[multi-provider] ${provider.name} exception:`, error instanceof Error ? error.message : error);
         if (attempt === 0) {

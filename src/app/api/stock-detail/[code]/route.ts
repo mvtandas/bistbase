@@ -92,7 +92,7 @@ export async function GET(
     const seasonality = safe(() => bars.length > 60 ? analyzeSeasonality(bars) : null, null);
 
     // 3b. Signal calibration — apply accuracy to signal strengths
-    let accuracyMap: Map<string, { signalType: string; totalCount: number; accurateCount: number; accuracyRate: number; adjustedStrength: number }> | null = null;
+    let accuracyMap: Awaited<ReturnType<typeof getSignalAccuracyMap>> | null = null;
     try {
       accuracyMap = await getSignalAccuracyMap();
       for (const s of signals) {

@@ -33,30 +33,39 @@ export async function generateStockAnalysis(
   input: StockAnalysisInputV2
 ): Promise<StockAnalysisOutputV2 | null> {
   const prompt = buildAnalysisPrompt(input);
+  const maxAttempts = 2;
 
-  const result = await callLLM(prompt, {
-    maxTokens: 2048,
-    temperature: 0.6,
-  });
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await callLLM(prompt, {
+      maxTokens: 2048,
+      temperature: 0.6,
+    });
 
-  if (!result) return null;
+    if (!result) {
+      if (attempt === 0) continue;
+      return null;
+    }
 
-  const parsed = parseAiJson(result.content);
-  if (!parsed) {
-    console.error(`Could not parse AI response for ${input.stockCode} from ${result.provider}`);
-    return null;
+    const parsed = parseAiJson(result.content);
+    if (!parsed) {
+      console.error(`[analysis] Parse failed (attempt ${attempt + 1}) for ${input.stockCode} from ${result.provider}`);
+      if (attempt === 0) continue;
+      return null;
+    }
+
+    return {
+      summaryText: typeof parsed.summaryText === "string" ? parsed.summaryText : "",
+      bullCase: typeof parsed.bullCase === "string" ? parsed.bullCase : "",
+      bearCase: typeof parsed.bearCase === "string" ? parsed.bearCase : "",
+      sentimentValue: typeof parsed.sentimentValue === "number"
+        ? Math.max(-100, Math.min(100, parsed.sentimentValue))
+        : 0,
+      confidence: ["HIGH", "MEDIUM", "LOW"].includes(parsed.confidence as string)
+        ? (parsed.confidence as string)
+        : "MEDIUM",
+      verdictReason: typeof parsed.verdictReason === "string" ? parsed.verdictReason : undefined,
+    };
   }
 
-  return {
-    summaryText: typeof parsed.summaryText === "string" ? parsed.summaryText : "",
-    bullCase: typeof parsed.bullCase === "string" ? parsed.bullCase : "",
-    bearCase: typeof parsed.bearCase === "string" ? parsed.bearCase : "",
-    sentimentValue: typeof parsed.sentimentValue === "number"
-      ? Math.max(-100, Math.min(100, parsed.sentimentValue))
-      : 0,
-    confidence: ["HIGH", "MEDIUM", "LOW"].includes(parsed.confidence as string)
-      ? (parsed.confidence as string)
-      : "MEDIUM",
-    verdictReason: typeof parsed.verdictReason === "string" ? parsed.verdictReason : undefined,
-  };
+  return null;
 }

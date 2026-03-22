@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { cacheGet, cacheSet } from "@/lib/redis";
 
 export interface SignalAccuracy {
   signalType: string;
@@ -11,17 +12,25 @@ export interface SignalAccuracy {
   accurateCount: number;
   accuracyRate: number;  // 0-100
   adjustedStrength: number; // sinyal bazında ayarlanmış güç multiplier
+  reliabilityLabel: "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT"; // kullanıcıya gösterilecek
 }
 
-// Son 90 günün verilerinden sinyal doğruluklarını hesapla
+// Son 180 günün verilerinden sinyal doğruluklarını hesapla
 export async function getSignalAccuracyMap(): Promise<Map<string, SignalAccuracy>> {
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 180); // 180 gün — nadir sinyaller için daha fazla veri
+  // Redis cache (6 hours — accuracy doesn't change frequently)
+  const cacheKey = "signal:accuracy:map";
+  const cached = await cacheGet<[string, SignalAccuracy][]>(cacheKey);
+  if (cached) {
+    return new Map(cached);
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 180);
 
   const signals = await prisma.signal.findMany({
     where: {
       wasAccurate: { not: null },
-      date: { gte: ninetyDaysAgo },
+      date: { gte: cutoff },
     },
     select: {
       signalType: true,
@@ -41,12 +50,11 @@ export async function getSignalAccuracyMap(): Promise<Map<string, SignalAccuracy
   const result = new Map<string, SignalAccuracy>();
 
   for (const [type, data] of grouped) {
-    if (data.total < 2) continue; // Minimum 2 sinyal lazım
+    if (data.total < 2) continue;
 
     const accuracyRate = (data.accurate / data.total) * 100;
 
     // Güç çarpanı: %70+ doğruluk = güçlendir, %40- = zayıflat
-    // Az örnekli sinyaller (2-3) için dar band kullan
     const isLowSample = data.total < 5;
     let adjustedStrength = 1.0;
     if (accuracyRate >= 80) adjustedStrength = isLowSample ? 1.15 : 1.3;
@@ -56,14 +64,26 @@ export async function getSignalAccuracyMap(): Promise<Map<string, SignalAccuracy
     else if (accuracyRate >= 40) adjustedStrength = isLowSample ? 0.85 : 0.75;
     else adjustedStrength = isLowSample ? 0.7 : 0.5;
 
+    // Reliability label for UI display
+    let reliabilityLabel: SignalAccuracy["reliabilityLabel"] = "INSUFFICIENT";
+    if (data.total >= 5) {
+      if (accuracyRate >= 65) reliabilityLabel = "HIGH";
+      else if (accuracyRate >= 50) reliabilityLabel = "MEDIUM";
+      else reliabilityLabel = "LOW";
+    }
+
     result.set(type, {
       signalType: type,
       totalCount: data.total,
       accurateCount: data.accurate,
       accuracyRate: Math.round(accuracyRate),
       adjustedStrength,
+      reliabilityLabel,
     });
   }
+
+  // Cache as serializable array
+  await cacheSet(cacheKey, [...result.entries()], 21600); // 6 hours
 
   return result;
 }

@@ -405,7 +405,76 @@ export async function runDailyAnalysis(): Promise<{
       await sleep(3000);
     } catch (error) {
       console.error(`Analysis failed for ${stockCode}:`, error);
+
+      // Mark as FAILED in DB so we can retry later
+      try {
+        await prisma.dailySummary.update({
+          where: { stockCode_date_timeframe: { stockCode, date: today, timeframe: "daily" } },
+          data: { status: "FAILED" },
+        });
+      } catch { /* already failed, ignore */ }
+
       failed++;
+    }
+  }
+
+  // ── RETRY: Re-process failed stocks (max 1 retry) ──
+  if (failed > 0) {
+    const failedStocks = await prisma.dailySummary.findMany({
+      where: { date: today, status: "FAILED", timeframe: "daily" },
+      select: { stockCode: true },
+    });
+
+    if (failedStocks.length > 0) {
+      console.log(`[analyze] Retrying ${failedStocks.length} failed stocks...`);
+      await sleep(10000); // Wait 10s before retry
+
+      for (const { stockCode } of failedStocks) {
+        try {
+          await prisma.dailySummary.update({
+            where: { stockCode_date_timeframe: { stockCode, date: today, timeframe: "daily" } },
+            data: { status: "PENDING" },
+          });
+
+          const [quote, bars] = await Promise.all([
+            getStockQuote(stockCode),
+            getHistoricalBars(stockCode, 220),
+          ]);
+
+          const price = quote?.price ?? null;
+          const changePercent = quote?.changePercent ?? null;
+          const volume = quote?.volume ?? null;
+
+          const technicals = bars.length > 0 ? calculateFullTechnicals(bars, price, volume) : null;
+          const fundamentalData = await getFundamentalData(stockCode).catch(() => null);
+          const fundScore = fundamentalData ? scoreFundamentals(fundamentalData) : null;
+          const macroData = await getMacroData().catch(() => null);
+          const score = technicals && price
+            ? calculateCompositeScore(technicals, price, 0, fundScore, macroData, null)
+            : null;
+
+          // Save minimal analysis without AI (faster, cheaper)
+          await prisma.dailySummary.update({
+            where: { stockCode_date_timeframe: { stockCode, date: today, timeframe: "daily" } },
+            data: {
+              closePrice: price,
+              changePercent,
+              volume: volume ? BigInt(Math.round(volume)) : null,
+              compositeScore: score?.composite ?? null,
+              analyzedAt: new Date(),
+              status: "COMPLETED",
+              aiSummaryText: null, // No AI on retry — just data
+            },
+          });
+
+          processed++;
+          failed--;
+          console.log(`[analyze] Retry succeeded for ${stockCode} (without AI)`);
+          await sleep(2000);
+        } catch (retryError) {
+          console.error(`[analyze] Retry also failed for ${stockCode}:`, retryError);
+        }
+      }
     }
   }
 

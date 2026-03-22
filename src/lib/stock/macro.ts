@@ -4,6 +4,7 @@
  */
 
 import YahooFinance from "yahoo-finance2";
+import { cacheGet, cacheSet } from "@/lib/redis";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({
@@ -71,7 +72,11 @@ async function fetchQuote(symbol: string): Promise<{
 }
 
 export async function getMacroData(): Promise<MacroData> {
-  // 1 saatlik cache
+  // Redis cache first (1 hour TTL)
+  const redisCached = await cacheGet<MacroData>("macro:data");
+  if (redisCached) return redisCached;
+
+  // In-memory fallback
   if (macroCache && Date.now() - macroCache.fetchedAt < 3600_000) {
     return macroCache.data;
   }
@@ -195,5 +200,6 @@ export async function getMacroData(): Promise<MacroData> {
   };
 
   macroCache = { data, fetchedAt: Date.now() };
+  await cacheSet("macro:data", data, 3600); // 1 hour
   return data;
 }

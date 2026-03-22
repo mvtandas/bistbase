@@ -117,6 +117,7 @@ export function SummaryTab({ d, data, period, summaries, pdLoading, pd, stockCod
         d={d}
         sentimentValue={verdictSentiment}
         verdictReason={verdictReasonText}
+        stockCode={stockCode}
       />
 
       {/* 2. Akıllı Özet — AI brifing */}

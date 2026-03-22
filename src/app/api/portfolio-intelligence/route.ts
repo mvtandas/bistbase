@@ -23,12 +23,10 @@ import { calculatePortfolioHealthScore } from "@/lib/stock/portfolio-health";
 import { runMonteCarloSimulation } from "@/lib/stock/monte-carlo";
 import { generatePortfolioNarrative } from "@/lib/stock/portfolio-narrative";
 import { calculateStressTest } from "@/lib/stock/stress-test";
+import { cacheGet, cacheSet } from "@/lib/redis";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
-
-// 5-minute cache (per timeframe)
-const cacheMap = new Map<string, { data: unknown; at: number }>();
 
 function safe<T>(fn: () => T, fallback: T): T {
   try { return fn(); } catch { return fallback; }
@@ -44,12 +42,12 @@ export async function GET(req: NextRequest) {
 
   const userId = session.user.id;
   const timeframe = (req.nextUrl.searchParams.get("timeframe") ?? "daily") as Timeframe;
-  const cacheKey = `${userId}:${timeframe}`;
+  const redisCacheKey = `portfolio:${userId}:${timeframe}`;
 
-  // Cache check (5 min)
-  const cached = cacheMap.get(cacheKey);
-  if (cached && Date.now() - cached.at < 300_000) {
-    return NextResponse.json(cached.data);
+  // Redis cache check (5 min)
+  const cached = await cacheGet<Record<string, unknown>>(redisCacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
   }
 
   const portfolios = await prisma.portfolio.findMany({
@@ -289,7 +287,7 @@ export async function GET(req: NextRequest) {
     };
 
     const responseData = { ...fullResult, timeframe };
-    cacheMap.set(cacheKey, { data: responseData, at: Date.now() });
+    await cacheSet(redisCacheKey, responseData, 300); // 5 min
     return NextResponse.json(responseData);
   } catch (error) {
     console.error("Portfolio intelligence failed:", error);

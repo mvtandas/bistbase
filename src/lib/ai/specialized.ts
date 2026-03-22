@@ -34,25 +34,35 @@ export async function generateSpecializedInsight<T>(
   options?: { maxTokens?: number; temperature?: number }
 ): Promise<T | null> {
   const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  const maxAttempts = 2;
 
-  const result = await callLLM(combinedPrompt, {
-    maxTokens: options?.maxTokens ?? 1024,
-    temperature: options?.temperature ?? 0.5,
-  });
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await callLLM(combinedPrompt, {
+      maxTokens: options?.maxTokens ?? 1024,
+      temperature: options?.temperature ?? 0.5,
+    });
 
-  if (!result) return null;
+    if (!result) {
+      if (attempt === 0) continue; // retry once
+      return null;
+    }
 
-  const parsed = parseAiJson(result.content);
-  if (!parsed) {
-    console.error(`[specialized] JSON parse failed from ${result.provider}. Raw: ${result.content.substring(0, 200)}`);
-    return null;
+    const parsed = parseAiJson(result.content);
+    if (!parsed) {
+      console.error(`[specialized] JSON parse failed (attempt ${attempt + 1}) from ${result.provider}. Raw: ${result.content.substring(0, 200)}`);
+      if (attempt === 0) continue; // retry with possibly different provider
+      return null;
+    }
+
+    const validated = validator(parsed);
+    if (!validated) {
+      console.error(`[specialized] Validation failed (attempt ${attempt + 1}) from ${result.provider}. Keys: ${Object.keys(parsed).join(", ")}`);
+      if (attempt === 0) continue;
+      return null;
+    }
+
+    return validated;
   }
 
-  const validated = validator(parsed);
-  if (!validated) {
-    console.error(`[specialized] Validation failed from ${result.provider}. Keys: ${Object.keys(parsed).join(", ")}`);
-    return null;
-  }
-
-  return validated;
+  return null;
 }

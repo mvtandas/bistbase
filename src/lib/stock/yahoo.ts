@@ -87,6 +87,12 @@ export async function getHistoricalBars(
   days = 220
 ): Promise<{ date: string; open: number; close: number; high: number; low: number; volume: number }[]> {
   const symbol = toISSymbol(code);
+  const cacheKey = `bars:${code.replace(".IS", "").toUpperCase()}:${days}`;
+
+  // Check Redis cache (15 min TTL for historical bars)
+  const cached = await cacheGet<{ date: string; open: number; close: number; high: number; low: number; volume: number }[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const start = new Date();
     start.setDate(start.getDate() - days);
@@ -95,7 +101,7 @@ export async function getHistoricalBars(
       period2: new Date(),
     });
     if (!history || !Array.isArray(history)) return [];
-    return history.map((bar: Record<string, unknown>) => ({
+    const bars = history.map((bar: Record<string, unknown>) => ({
       date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
       open: (bar.open as number) ?? 0,
       close: (bar.close as number) ?? 0,
@@ -103,6 +109,8 @@ export async function getHistoricalBars(
       low: (bar.low as number) ?? 0,
       volume: (bar.volume as number) ?? 0,
     }));
+    await cacheSet(cacheKey, bars, 900); // 15 min
+    return bars;
   } catch (error) {
     console.error(`Historical data error for ${symbol}:`, error);
     return [];
@@ -115,6 +123,12 @@ export async function getHistoricalBarsInterval(
   days = 730
 ): Promise<{ date: string; open: number; close: number; high: number; low: number; volume: number }[]> {
   const symbol = toISSymbol(code);
+  const cacheKey = `bars:${code.replace(".IS", "").toUpperCase()}:${interval}:${days}`;
+
+  // Check Redis cache (30 min TTL for weekly/monthly bars)
+  const cached = await cacheGet<{ date: string; open: number; close: number; high: number; low: number; volume: number }[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const start = new Date();
     start.setDate(start.getDate() - days);
@@ -124,7 +138,7 @@ export async function getHistoricalBarsInterval(
       interval,
     });
     if (!history || !Array.isArray(history)) return [];
-    return history.map((bar: Record<string, unknown>) => ({
+    const bars = history.map((bar: Record<string, unknown>) => ({
       date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
       open: (bar.open as number) ?? 0,
       close: (bar.close as number) ?? 0,
@@ -132,6 +146,8 @@ export async function getHistoricalBarsInterval(
       low: (bar.low as number) ?? 0,
       volume: (bar.volume as number) ?? 0,
     }));
+    await cacheSet(cacheKey, bars, 1800); // 30 min
+    return bars;
   } catch (error) {
     console.error(`Historical interval data error for ${symbol}:`, error);
     return [];

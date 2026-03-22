@@ -3,8 +3,9 @@
 import { cn } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, Minus, ShieldAlert, Info,
-  ChevronRight, BarChart3, DollarSign, Zap,
+  ChevronRight, BarChart3, DollarSign, Zap, Target,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { calculateVerdict, type VerdictAction, type Verdict, type VerdictInput } from "@/lib/stock/verdict";
 import type { StockDetail } from "@/components/stock-detail/types";
 
@@ -102,13 +103,35 @@ function generateFallbackSummary(v: Verdict): string {
 
 /* ═══ Main Component ═══ */
 
+interface VerdictAccuracy {
+  winRate: number;
+  totalVerdicts: number;
+  byHorizon: {
+    "20D": { winRate: number; sampleSize: number } | null;
+    "10D": { winRate: number; sampleSize: number } | null;
+  };
+}
+
 interface VerdictCardProps {
   d: StockDetail;
   sentimentValue?: number | null;
   verdictReason?: string | null;
+  stockCode?: string;
 }
 
-export function VerdictCard({ d, sentimentValue, verdictReason }: VerdictCardProps) {
+export function VerdictCard({ d, sentimentValue, verdictReason, stockCode }: VerdictCardProps) {
+  // Fetch accuracy data for this stock
+  const { data: accuracy } = useQuery<VerdictAccuracy>({
+    queryKey: ["verdict-accuracy", stockCode],
+    queryFn: async () => {
+      const r = await fetch(`/api/verdict-accuracy${stockCode ? `?stockCode=${stockCode}` : ""}`);
+      if (!r.ok) return null;
+      return r.json();
+    },
+    enabled: !!stockCode,
+    staleTime: 60 * 60 * 1000, // 1 hour
+  });
+
   if (!d.price || !d.technicals) return null;
 
   const input: VerdictInput = {
@@ -164,6 +187,17 @@ export function VerdictCard({ d, sentimentValue, verdictReason }: VerdictCardPro
                 <span className={cn("text-[9px] font-semibold px-1.5 py-0.5 rounded-full", agree.color)}>
                   {agree.label}
                 </span>
+                {accuracy && accuracy.totalVerdicts >= 10 && (
+                  <span className={cn(
+                    "text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5",
+                    accuracy.winRate >= 55 ? "bg-gain/15 text-gain"
+                      : accuracy.winRate >= 45 ? "bg-amber-400/15 text-amber-400"
+                        : "bg-loss/15 text-loss",
+                  )}>
+                    <Target className="h-2.5 w-2.5" />
+                    %{accuracy.winRate.toFixed(0)} İsabet
+                  </span>
+                )}
               </div>
             </div>
           </div>

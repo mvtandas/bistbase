@@ -5,6 +5,7 @@
  */
 
 import YahooFinance from "yahoo-finance2";
+import { cacheGet, cacheSet } from "@/lib/redis";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({
@@ -86,6 +87,11 @@ function calcDaysTo(val: unknown): number | null {
 
 export async function getFundamentalData(stockCode: string): Promise<FundamentalData | null> {
   const symbol = `${stockCode.toUpperCase()}.IS`;
+  const cacheKey = `fundamental:${stockCode.toUpperCase()}`;
+
+  // Redis cache (6 hour TTL — fundamental data changes slowly)
+  const cached = await cacheGet<FundamentalData>(cacheKey);
+  if (cached) return cached;
 
   try {
     // quoteSummary gives us detailed financial data
@@ -137,7 +143,7 @@ export async function getFundamentalData(stockCode: string): Promise<Fundamental
     const ebit = (fd.ebitda as number) ?? null; // approximate EBIT from EBITDA
     // Yahoo doesn't provide interest expense directly, so we skip if unavailable
 
-    return {
+    const result: FundamentalData = {
       peRatio: (quote?.trailingPE as number) ?? (sd.trailingPE as number) ?? null,
       forwardPE,
       pegRatio,
@@ -166,6 +172,9 @@ export async function getFundamentalData(stockCode: string): Promise<Fundamental
       exDividendDate: parseDate(sd.exDividendDate),
       daysToEarnings: calcDaysTo(quote?.earningsTimestamp ?? ks.nextFiscalYearEnd),
     };
+
+    await cacheSet(cacheKey, result, 21600); // 6 hours
+    return result;
   } catch (error) {
     console.error(`Fundamental data error for ${stockCode}:`, error);
     return null;
