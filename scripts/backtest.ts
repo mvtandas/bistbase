@@ -50,7 +50,6 @@ const RESULTS_DIR = join(DATA_DIR, "results");
 const MIN_BARS_FOR_ANALYSIS = 200; // MA200 warmup
 const MIN_AVG_VOLUME = 500_000; // Minimum 20-gün ort. günlük hacim (lot) — canlı sistemle aynı
 const MIN_SIGNAL_STRENGTH = 45; // Hafif yükseltilmiş eşik
-const MIN_BULLISH_CONFLUENCE = 2; // AL/GUCLU_AL için minimum bullish sinyal (strength >= 60)
 
 // ═══ Helpers ═══
 
@@ -383,15 +382,11 @@ async function main() {
       }
 
       // ── Aggregate verdicts ──
-      // Confluence check: güçlü sinyaller (strength >= 60) sayılır
+      // Confluence: GUCLU_AL için en az 2 güçlü bullish sinyal gerek (kalite filtresi)
+      // AL→TUT downgrade kaldırıldı — TUT'u gereksiz şişiriyordu
       const strongBullish = filteredSignals.filter(s => s.direction === "BULLISH" && s.strength >= 60).length;
-
-      // GUCLU_AL: en az 2 güçlü bullish sinyal gerek, AL: en az 1
-      if (verdictAction === "GUCLU_AL" && strongBullish < MIN_BULLISH_CONFLUENCE) {
-        verdictAction = strongBullish >= 1 ? "AL" : "TUT";
-      }
-      if (verdictAction === "AL" && strongBullish < 1) {
-        verdictAction = "TUT";
+      if (verdictAction === "GUCLU_AL" && strongBullish < 2) {
+        verdictAction = "AL";
       }
 
       if (verdictAction) {

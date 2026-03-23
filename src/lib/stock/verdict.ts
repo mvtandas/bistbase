@@ -499,11 +499,13 @@ function calculateFlowPillar(input: VerdictInput): FlowPillar {
 
 interface PillarWeights { technical: number; fundamental: number; flow: number }
 
+// System backtest v6: technical ağırlığı artırıldı, flow azaltıldı
+// Teknik indikatörler (MA, MACD, RSI) sinyallerden daha tutarlı
 const REGIME_PILLAR_WEIGHTS: Record<VolatilityRegime, PillarWeights> = {
-  LOW:    { technical: 0.35, fundamental: 0.40, flow: 0.25 },
-  NORMAL: { technical: 0.40, fundamental: 0.30, flow: 0.30 },
-  HIGH:   { technical: 0.40, fundamental: 0.20, flow: 0.40 },
-  CRISIS: { technical: 0.30, fundamental: 0.15, flow: 0.55 },
+  LOW:    { technical: 0.40, fundamental: 0.35, flow: 0.25 },
+  NORMAL: { technical: 0.45, fundamental: 0.30, flow: 0.25 },   // eskisi: tech 0.40, flow 0.30
+  HIGH:   { technical: 0.45, fundamental: 0.20, flow: 0.35 },   // eskisi: tech 0.40, flow 0.40
+  CRISIS: { technical: 0.35, fundamental: 0.15, flow: 0.50 },   // eskisi: tech 0.30, flow 0.55
 };
 
 function getPillarWeights(
@@ -606,7 +608,7 @@ function calculateConfidence(
   else if (nonZero.length >= 2) {
     const counts = { pos: nonZero.filter(s => s > 0).length, neg: nonZero.filter(s => s < 0).length };
     if (counts.pos >= 2 || counts.neg >= 2) conf += 10;
-    else conf -= 20; // çatışma: daha sert ceza (eskisi: -15)
+    else conf -= 10; // çatışma: azaltılmış ceza (eskisi: -20, BIST'te pillar conflict sık)
   } else {
     conf -= 5; // insufficient data
   }
@@ -616,7 +618,7 @@ function calculateConfidence(
   const oscSign = sign(tech.oscRating);
   if (maSign !== 0 && oscSign !== 0) {
     if (maSign === oscSign) conf += 5;
-    else conf -= 12;
+    else conf -= 7; // eskisi: -12
   }
 
   // C. Signal accuracy — enhanced with backtest data
@@ -667,7 +669,7 @@ function calculateConfidence(
     const al = input.multiTimeframe.alignment;
     if (al === "STRONG_ALIGNED") conf += 10;
     else if (al === "ALIGNED") conf += 5;
-    else if (al === "CONFLICTING") conf -= 15; // güçlendirilmiş (eskisi: -10)
+    else if (al === "CONFLICTING") conf -= 8; // azaltılmış (eskisi: -15)
     else conf -= 3;
   } else { conf -= 5; }
 

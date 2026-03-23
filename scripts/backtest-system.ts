@@ -48,7 +48,6 @@ const RESULTS_DIR = join(DATA_DIR, "results");
 const MIN_BARS = 200;
 const MIN_AVG_VOLUME = 500_000;
 const MIN_SIGNAL_STRENGTH = 45;
-const MIN_BULLISH_CONFLUENCE = 2;
 const HORIZONS = ["1D", "5D", "10D", "20D"] as const;
 const HORIZON_OFFSETS: Record<string, number> = { "1D": 1, "5D": 5, "10D": 10, "20D": 20 };
 const SCORE_RANGES = ["0-40", "40-48", "48-55", "55-100"] as const;
@@ -251,11 +250,11 @@ async function main() {
         });
       } catch { /* skip */ }
 
-      // Confluence override (backtest.ts ile aynı)
+      // Confluence: GUCLU_AL için en az 2 güçlü bullish sinyal gerek
+      // AL→TUT downgrade kaldırıldı — TUT'u gereksiz şişiriyordu
       let verdictAction = verdict?.action ?? null;
       const strongBullish = filteredSignals.filter(s => s.direction === "BULLISH" && s.strength >= 60).length;
-      if (verdictAction === "GUCLU_AL" && strongBullish < MIN_BULLISH_CONFLUENCE) verdictAction = strongBullish >= 1 ? "AL" : "TUT";
-      if (verdictAction === "AL" && strongBullish < 1) verdictAction = "TUT";
+      if (verdictAction === "GUCLU_AL" && strongBullish < 2) verdictAction = "AL";
 
       // Outcomes
       const outcomes: Record<string, number | null> = {};
