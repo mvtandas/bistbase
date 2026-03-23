@@ -10,6 +10,7 @@ import { STOCK_SECTOR_MAP, SECTOR_INDICES } from "@/lib/stock/sectors";
 import { getBatchQuotes } from "@/lib/stock/yahoo";
 import { getMacroData } from "@/lib/stock/macro";
 import { detectVolatilityRegime } from "@/lib/stock/scoring";
+import { getSignalAccuracyMap } from "@/lib/stock/signal-calibration";
 
 export const maxDuration = 60;
 
@@ -39,10 +40,24 @@ export async function GET(request: NextRequest) {
     const stockList = STOCK_LISTS[index];
 
     // ── DailySummary + TechnicalSnapshot + Signals + Macro ──
-    const [summaries, snapshots, signals, prices, macroData] = await Promise.all([
+    // Bugün veri yoksa son mevcut günü bul (piyasa kapalıyken veya henüz scan çalışmamışken)
+    let analysisDate = today;
+    const todayCount = await prisma.dailySummary.count({
+      where: { date: dayRange(today), stockCode: { in: [...stockList] }, timeframe: "daily", status: "COMPLETED" },
+    });
+    if (todayCount === 0) {
+      const lastEntry = await prisma.dailySummary.findFirst({
+        where: { stockCode: { in: [...stockList] }, timeframe: "daily", status: "COMPLETED", verdictAction: { not: null } },
+        orderBy: { date: "desc" },
+        select: { date: true },
+      });
+      if (lastEntry) analysisDate = lastEntry.date;
+    }
+
+    const [summaries, snapshots, signals, prices, macroData, accuracyMap] = await Promise.all([
       prisma.dailySummary.findMany({
         where: {
-          date: dayRange(today),
+          date: dayRange(analysisDate),
           stockCode: { in: [...stockList] },
           timeframe: "daily",
           status: "COMPLETED",
@@ -51,16 +66,16 @@ export async function GET(request: NextRequest) {
       }),
       prisma.technicalSnapshot.findMany({
         where: {
-          date: dayRange(today),
+          date: dayRange(analysisDate),
           stockCode: { in: [...stockList] },
         },
       }),
       prisma.signal.findMany({
         where: {
-          date: dayRange(today),
+          date: dayRange(analysisDate),
           stockCode: { in: [...stockList] },
         },
-        select: { stockCode: true, signalDirection: true },
+        select: { stockCode: true, signalType: true, signalDirection: true, strength: true, description: true },
       }),
       // Fiyatları batch'ler halinde çek (getBatchQuotes max 50)
       (async () => {
@@ -74,15 +89,27 @@ export async function GET(request: NextRequest) {
         return result;
       })(),
       getMacroData().catch(() => null),
+      getSignalAccuracyMap().catch(() => new Map()),
     ]);
 
-    // Sinyal sayılarını hisse bazında topla
+    // Sinyal sayılarını ve detaylarını hisse bazında topla
     const signalCountMap = new Map<string, { bullish: number; bearish: number }>();
+    const signalDetailMap = new Map<string, { type: string; direction: string; strength: number; description: string }[]>();
     for (const sig of signals) {
       const counts = signalCountMap.get(sig.stockCode) ?? { bullish: 0, bearish: 0 };
       if (sig.signalDirection === "BULLISH") counts.bullish++;
       else if (sig.signalDirection === "BEARISH") counts.bearish++;
       signalCountMap.set(sig.stockCode, counts);
+
+      const details = signalDetailMap.get(sig.stockCode) ?? [];
+      details.push({ type: sig.signalType, direction: sig.signalDirection, strength: sig.strength, description: sig.description });
+      signalDetailMap.set(sig.stockCode, details);
+    }
+
+    // Sinyal accuracy kayıtları (UI'da win rate göstermek için)
+    const signalAccuracyRecord: Record<string, { rate: number; count: number; reliability: string }> = {};
+    for (const [type, acc] of accuracyMap) {
+      signalAccuracyRecord[type] = { rate: acc.accuracyRate, count: acc.totalCount, reliability: acc.reliabilityLabel };
     }
 
     const regime = detectVolatilityRegime(macroData);
@@ -138,7 +165,7 @@ export async function GET(request: NextRequest) {
           fiftyTwoWeekLow: null,
           fromFiftyTwoHigh: null,
           riskMetrics: null,
-          signals: [],
+          signals: (signalDetailMap.get(code) ?? []).sort((a, b) => b.strength - a.strength),
           signalCombination: null,
           multiTimeframe: null,
           sectorCode,
@@ -205,6 +232,7 @@ export async function GET(request: NextRequest) {
           sellCount: sell, strongSellCount: strongSell,
           bullishSignalCount: totalBullish, bearishSignalCount: totalBearish,
         },
+        signalAccuracy: signalAccuracyRecord,
         stale: false,
       };
 
