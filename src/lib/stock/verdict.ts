@@ -576,13 +576,13 @@ function applyRiskAdjustment(rawScore: number, risk: VerdictInput["riskMetrics"]
 // ═══════════════════════════════════════
 
 // BIST100 5Y backtest ile kalibre edildi:
-// AL %60.8 WR → eşik hafif düşürüldü (daha fazla AL yakalansın)
-// SAT %46.5 WR → eşik yükseltildi (daha güçlü kanıt gereksin)
+// Iterasyon 1: TUT zone daraltıldı (-0.30→-0.20, +0.15→+0.20)
+// Margin'al setup'lar TUT yerine AL/SAT'a düşsün
 function scoreToAction(score: number): VerdictAction {
-  if (score >= 0.45) return "GUCLU_AL";  // eskisi: 0.50
-  if (score >= 0.15) return "AL";         // eskisi: 0.20
-  if (score > -0.30) return "TUT";        // eskisi: -0.20 (TUT aralığı genişledi)
-  if (score > -0.60) return "SAT";        // eskisi: -0.50 (SAT için daha güçlü sinyal gerekli)
+  if (score >= 0.45) return "GUCLU_AL";
+  if (score >= 0.20) return "AL";         // eskisi: 0.15 (daraltıldı)
+  if (score > -0.20) return "TUT";        // eskisi: -0.30 (daraltıldı)
+  if (score > -0.60) return "SAT";
   return "GUCLU_SAT";
 }
 
@@ -678,16 +678,18 @@ function calculateConfidence(
     if (ct === "STRONG_BULLISH" || ct === "STRONG_BEARISH") conf += 7;
   }
 
-  // F. Verdict strength
+  // F. Verdict strength — score 0'a yakınsa TUT beklenir, ceza yerine nötr
   const dist = Math.abs(adjustedScore);
   if (dist > 0.6) conf += 8;
-  else if (dist < 0.10) conf -= 10;
+  else if (dist > 0.3) conf += 3;
+  // dist < 0.1 artık ceza yok — TUT zone'unda düşük dist doğal
 
-  // G. Data availability
-  if (!input.fundamentalScore) conf -= 8;
-  if (!input.multiTimeframe) conf -= 5;
-  if (!input.macroData) conf -= 3;
-  if (!input.extraIndicators) conf -= 3;
+  // G. Data availability — azaltılmış cezalar
+  // System backtest v2: eksik veri cezaları HIGH confidence'ı imkansız kılıyordu
+  if (!input.fundamentalScore) conf -= 4;   // eskisi: -8
+  if (!input.multiTimeframe) conf -= 3;     // eskisi: -5
+  if (!input.macroData) conf -= 2;          // eskisi: -3
+  if (!input.extraIndicators) conf -= 2;    // eskisi: -3
 
   // H. Ekonomik takvim — yaklaşan kritik event confidence düşürür (B3)
   if (input.economicCalendar?.volatilityWarning && input.economicCalendar.daysToNextCritical != null) {
@@ -843,7 +845,8 @@ export function calculateVerdict(input: VerdictInput): Verdict {
 
   // 6. Confidence
   const confidence = calculateConfidence(technical, fundamental, flow, score, input);
-  const confidenceLevel = confidence >= 70 ? "HIGH" as const : confidence >= 45 ? "MEDIUM" as const : "LOW" as const;
+  // System backtest v3: HIGH eşiği 70→62 (eksik veri ortamında ulaşılabilir olsun)
+  const confidenceLevel = confidence >= 62 ? "HIGH" as const : confidence >= 45 ? "MEDIUM" as const : "LOW" as const;
   const confidenceLabel = confidenceLevel === "HIGH" ? "Yüksek" : confidenceLevel === "LOW" ? "Düşük" : "Orta";
 
   // 7. Agreement

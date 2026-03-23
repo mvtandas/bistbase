@@ -121,20 +121,23 @@ function clamp(v: number, min = 0, max = 100) {
 function scoreTechnical(t: FullTechnicalData, price: number): number {
   let score = 50;
 
+  const isOversold = t.rsi14 != null && t.rsi14 <= 30;
+  const isOverbought = t.rsi14 != null && t.rsi14 >= 70;
+
   if (t.rsi14 != null) {
-    if (t.rsi14 >= 70) score += t.rsiBearishDivergence ? -25 : -5;
-    else if (t.rsi14 <= 30) score += t.rsiBullishDivergence ? 25 : 5;
+    if (isOverbought) score += t.rsiBearishDivergence ? -25 : -5;
+    else if (isOversold) score += t.rsiBullishDivergence ? 25 : 10; // eskisi: 5 → 10 (oversold bounce BIST'te güçlü)
     else if (t.rsi14 >= 40 && t.rsi14 <= 60) score += 10;
   }
 
   // MA alignment scoring — BIST100 5Y backtest ile kalibre edildi
-  // BIST'te bearish trend cezası azaltıldı: düşüşler kısa, toparlanmalar hızlı
-  // Kaçırılan trade analizi: MA_STRONG_BEARISH -25 cezası dip recovery'leri engelliyor
+  // Oversold + bearish trend = mean-reversion fırsatı → cezayı yarıya düşür
+  // System backtest v1: skor 0-40 = %3.9 avg return (en yüksek) ama düşük skor alıyorlardı
   switch (t.maAlignment) {
     case "STRONG_BULLISH": score += 25; break;
     case "BULLISH": score += 15; break;
-    case "BEARISH": score -= 10; break;   // eskisi: -15
-    case "STRONG_BEARISH": score -= 15; break;  // eskisi: -25
+    case "BEARISH": score -= isOversold ? 5 : 10; break;       // oversold'da: -5 (normal: -10)
+    case "STRONG_BEARISH": score -= isOversold ? 7 : 15; break; // oversold'da: -7 (normal: -15)
   }
 
   if (t.support != null && t.resistance != null && price > 0) {
@@ -154,10 +157,13 @@ function scoreTechnical(t: FullTechnicalData, price: number): number {
 // ── Momentum Score ──
 function scoreMomentum(t: FullTechnicalData): number {
   let score = 50;
+  const oversold = (t.rsi14 != null && t.rsi14 <= 30) || (t.stochK != null && t.stochK <= 20);
 
   if (t.macdHistogram != null) {
     if (t.macdHistogram > 0) score += t.macdCrossover === "BULLISH_CROSS" ? 15 : 10;
-    else score -= t.macdCrossover === "BEARISH_CROSS" ? 15 : 10;
+    else score -= oversold
+      ? (t.macdCrossover === "BEARISH_CROSS" ? 8 : 5)   // oversold'da azaltılmış ceza
+      : (t.macdCrossover === "BEARISH_CROSS" ? 15 : 10);
   }
 
   if (t.stochK != null) {
