@@ -15,6 +15,7 @@ import { calculateVerdict, type VerdictInput, type Verdict } from "../src/lib/st
 import { calculateExtraIndicators } from "../src/lib/stock/extra-indicators";
 import { ROUND_TRIP_COST } from "../src/lib/stock/bist-constants";
 import { BLACKLISTED_SIGNALS } from "../src/lib/stock/signal-filter";
+import { scoreFundamentals, type FundamentalData, type FundamentalScore } from "../src/lib/stock/fundamentals";
 import { BIST_ALL, BIST100, BIST50, BIST30 } from "../src/lib/constants";
 
 // ═══ Types ═══
@@ -116,6 +117,12 @@ function buildMacroMap(macro: Record<string, HistoricalBar[]>) {
   return map;
 }
 
+function loadFundamentals(): Record<string, FundamentalData> | null {
+  const p = join(DATA_DIR, "fundamentals.json");
+  if (!existsSync(p)) return null;
+  try { return JSON.parse(readFileSync(p, "utf-8")); } catch { return null; }
+}
+
 function getScoreRange(composite: number): typeof SCORE_RANGES[number] {
   if (composite < 40) return "0-40";
   if (composite < 48) return "40-48";
@@ -163,8 +170,18 @@ async function main() {
     ? new Map(macro.bist100.filter((b: HistoricalBar) => b.close > 0).map((b: HistoricalBar) => [b.date, b.close]))
     : null;
 
+  // Fundamental veri yükle (statik — tüm barlar için aynı skor kullanılır)
+  const fundamentalsRaw = loadFundamentals();
+  const fundamentalScores: Record<string, FundamentalScore> = {};
+  if (fundamentalsRaw) {
+    for (const [code, data] of Object.entries(fundamentalsRaw)) {
+      fundamentalScores[code] = scoreFundamentals(data as FundamentalData);
+    }
+  }
+  const hasFundamentals = Object.keys(fundamentalScores).length > 0;
+
   console.log(`\n${B}═══ SİSTEM DOĞRULUK TESTİ: ${scope.toUpperCase()} ═══${X}`);
-  console.log(`Hisse: ${stocks.length} | Adım: ${name}\n`);
+  console.log(`Hisse: ${stocks.length} | Adım: ${name} | Fundamental: ${hasFundamentals ? `${Object.keys(fundamentalScores).length} hisse` : "YOK"}\n`);
 
   // ── Aggregators ──
 
@@ -226,8 +243,11 @@ async function main() {
       const dateMacro = macroMap?.get(currentBar.date) ?? null;
       const macroData = dateMacro ? { vix: dateMacro.vix, bist100Change: dateMacro.bist100Change, usdTryChange: dateMacro.usdTryChange, macroScore: dateMacro.macroScore } : null;
 
-      // Composite score
-      const score = calculateCompositeScore(technicals, price, 0, null, macroData);
+      // Fundamental score (statik — hisse bazında, tarihten bağımsız)
+      const fundScore = fundamentalScores[code] ?? null;
+
+      // Composite score (fundamental dahil)
+      const score = calculateCompositeScore(technicals, price, 0, fundScore ?? null, macroData);
       const composite = score?.composite ?? 50;
 
       // Verdict (full object)
@@ -239,7 +259,7 @@ async function main() {
           technicals: technicals as unknown as Record<string, unknown>,
           extraIndicators: extraIndicators as unknown as VerdictInput["extraIndicators"],
           score,
-          fundamentalScore: null,
+          fundamentalScore: fundScore,
           signals: filteredSignals,
           signalCombination: null,
           signalAccuracy: {},
