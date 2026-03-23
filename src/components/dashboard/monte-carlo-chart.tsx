@@ -74,10 +74,30 @@ export function MonteCarloChart() {
     );
   }
 
-  if (isError || !data) return null;
+  if (isError || !data) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Activity className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Monte Carlo Projeksiyonu</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Monte Carlo verileri yüklenemedi.</p>
+      </div>
+    </div>
+  );
 
   const mc = data?.monteCarlo;
-  if (!mc || mc.projections.length < 3) return null;
+  if (!mc || !mc.projections || mc.projections.length < 3) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Activity className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Monte Carlo Projeksiyonu</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Simülasyon için yeterli veri yok (min. 20 günlük getiri gerekli).</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">
@@ -111,9 +131,9 @@ export function MonteCarloChart() {
           <div className="text-center p-2.5 rounded-xl bg-card/30 border border-border/15">
             <div className="text-[11px] text-muted-foreground/50">%90 Aralık</div>
             <div className="text-sm font-bold tabular-nums text-foreground mt-0.5">
-              <span className="text-loss">{mc.expectedReturnRange[0]}%</span>
+              <span className="text-loss">{mc.expectedReturnRange?.[0] ?? "?"}%</span>
               <span className="text-muted-foreground/40 mx-1">→</span>
-              <span className="text-gain">{mc.expectedReturnRange[1]}%</span>
+              <span className="text-gain">{mc.expectedReturnRange?.[1] ?? "?"}%</span>
             </div>
           </div>
         </div>

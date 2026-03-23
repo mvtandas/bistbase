@@ -29,10 +29,30 @@ export function PortfolioEquityChart() {
     );
   }
 
-  if (isError || !data) return null;
+  if (isError || !data) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <TrendingUp className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Portföy Performansı</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Performans verisi yüklenemedi.</p>
+      </div>
+    </div>
+  );
 
   const curve = data?.equityCurve ?? [];
-  if (curve.length < 5) return null;
+  if (curve.length < 5) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <TrendingUp className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Portföy Performansı</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Performans grafiği için yeterli geçmiş veri yok.</p>
+      </div>
+    </div>
+  );
 
   // Filter by range
   const daysMap: Record<Range, number> = { "1M": 22, "3M": 66, "6M": 132, "ALL": 9999 };

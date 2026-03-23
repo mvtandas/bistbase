@@ -37,10 +37,30 @@ export function SectorRotationCard() {
     );
   }
 
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <RefreshCw className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Sektör Rotasyonu</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Sektör rotasyon verisi mevcut değil.</p>
+      </div>
+    </div>
+  );
 
   const withData = data.filter(s => s.change1W != null);
-  if (withData.length === 0) return null;
+  if (withData.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <RefreshCw className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Sektör Rotasyonu</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Sektör performans verisi henüz hesaplanmadı.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">

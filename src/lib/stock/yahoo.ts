@@ -5,6 +5,16 @@ import { cacheGet, cacheSet } from "@/lib/redis";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
 
+/** Return a safe end date that excludes any incomplete (today's) bar.
+ *  Yahoo Finance uses UTC dates but BIST operates in UTC+3.
+ *  We subtract 1 day to guarantee no partial bar is included. */
+function safeEndDate(): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+}
+
 function toISSymbol(code: string): string {
   const clean = code.replace(".IS", "").toUpperCase();
   return `${clean}.IS`;
@@ -41,10 +51,13 @@ export async function getStockQuote(code: string): Promise<StockQuote | null> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
 
-    const history = await yf.historical(symbol, {
+    const chartResult = await yf.chart(symbol, {
       period1: startDate,
-      period2: endDate,
+      period2: new Date(),
     });
+    const history = (chartResult?.quotes ?? []).filter(
+      (b: Record<string, unknown>) => b.close != null
+    );
 
     if (history && history.length > 0) {
       const latest = history[history.length - 1];
@@ -96,19 +109,24 @@ export async function getHistoricalBars(
   try {
     const start = new Date();
     start.setDate(start.getDate() - days);
-    const history = await yf.historical(symbol, {
+    // Use chart() directly — historical() has a hardcoded throw for partial null bars
+    // that cannot be disabled, breaking queries during market hours (BIST UTC+3).
+    const chartResult = await yf.chart(symbol, {
       period1: start,
       period2: new Date(),
     });
-    if (!history || !Array.isArray(history)) return [];
-    const bars = history.map((bar: Record<string, unknown>) => ({
-      date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
-      open: (bar.open as number) ?? 0,
-      close: (bar.close as number) ?? 0,
-      high: (bar.high as number) ?? 0,
-      low: (bar.low as number) ?? 0,
-      volume: (bar.volume as number) ?? 0,
-    }));
+    const quotes = chartResult?.quotes;
+    if (!quotes || !Array.isArray(quotes)) return [];
+    const bars = quotes
+      .filter((bar: Record<string, unknown>) => bar.close != null && bar.open != null)
+      .map((bar: Record<string, unknown>) => ({
+        date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
+        open: (bar.open as number) ?? 0,
+        close: (bar.close as number) ?? 0,
+        high: (bar.high as number) ?? 0,
+        low: (bar.low as number) ?? 0,
+        volume: (bar.volume as number) ?? 0,
+      }));
     // Only cache non-empty results to avoid propagating temporary Yahoo failures
     if (bars.length > 0) {
       await cacheSet(cacheKey, bars, 900); // 15 min
@@ -135,20 +153,25 @@ export async function getHistoricalBarsInterval(
   try {
     const start = new Date();
     start.setDate(start.getDate() - days);
-    const history = await yf.historical(symbol, {
+    // Use chart() directly — historical() has a hardcoded throw for partial null bars
+    // that cannot be disabled via options, breaking weekly/monthly queries during market hours.
+    const chartResult = await yf.chart(symbol, {
       period1: start,
       period2: new Date(),
       interval,
     });
-    if (!history || !Array.isArray(history)) return [];
-    const bars = history.map((bar: Record<string, unknown>) => ({
-      date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
-      open: (bar.open as number) ?? 0,
-      close: (bar.close as number) ?? 0,
-      high: (bar.high as number) ?? 0,
-      low: (bar.low as number) ?? 0,
-      volume: (bar.volume as number) ?? 0,
-    }));
+    const quotes = chartResult?.quotes;
+    if (!quotes || !Array.isArray(quotes)) return [];
+    const bars = quotes
+      .filter((bar: Record<string, unknown>) => bar.close != null && bar.open != null)
+      .map((bar: Record<string, unknown>) => ({
+        date: bar.date ? new Date(bar.date as string).toISOString().split("T")[0] : "",
+        open: (bar.open as number) ?? 0,
+        close: (bar.close as number) ?? 0,
+        high: (bar.high as number) ?? 0,
+        low: (bar.low as number) ?? 0,
+        volume: (bar.volume as number) ?? 0,
+      }));
     // Only cache non-empty results to avoid propagating temporary Yahoo failures
     if (bars.length > 0) {
       await cacheSet(cacheKey, bars, 1800); // 30 min

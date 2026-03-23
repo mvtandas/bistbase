@@ -13,16 +13,15 @@ interface MetricDef {
   tooltip: string;
   goodAbove?: number;
   goodBelow?: number;
-  invert?: boolean;
 }
 
 const METRICS: MetricDef[] = [
   { key: "sharpeRatio", label: "Sharpe", suffix: "", tooltip: "Risk-ayarlı getiri. >1 iyi, >2 mükemmel", goodAbove: 0.5 },
   { key: "sortinoRatio", label: "Sortino", suffix: "", tooltip: "Aşağı yönlü risk-ayarlı getiri. >1 iyi", goodAbove: 0.5 },
   { key: "calmarRatio", label: "Calmar", suffix: "", tooltip: "Yıllık getiri / max drawdown. >1 iyi", goodAbove: 0.5 },
-  { key: "var95", label: "VaR (%95)", suffix: "%", tooltip: "Günlük max kayıp (%95 güvenle)", goodBelow: -1, invert: true },
-  { key: "cvar95", label: "CVaR", suffix: "%", tooltip: "VaR aşılırsa beklenen ortalama kayıp", goodBelow: -1.5, invert: true },
-  { key: "annualizedVolatility", label: "Volatilite", suffix: "%", tooltip: "Yıllıklaştırılmış fiyat dalgalanması", goodBelow: 30, invert: true },
+  { key: "var95", label: "VaR (%95)", suffix: "%", tooltip: "Günlük max kayıp (%95 güvenle)", goodAbove: -1 },
+  { key: "cvar95", label: "CVaR", suffix: "%", tooltip: "VaR aşılırsa beklenen ortalama kayıp", goodAbove: -1.5 },
+  { key: "annualizedVolatility", label: "Volatilite", suffix: "%", tooltip: "Yıllıklaştırılmış fiyat dalgalanması", goodBelow: 30 },
   { key: "winRate", label: "Kazanma", suffix: "%", tooltip: "Pozitif getirili gün oranı", goodAbove: 50 },
   { key: "profitFactor", label: "K/Z Faktörü", suffix: "x", tooltip: "Toplam kazanç / toplam kayıp", goodAbove: 1.2 },
 ];
@@ -45,7 +44,17 @@ export function RiskMetricsSummary() {
   }
 
   const metrics = data?.extendedRiskMetrics;
-  if (!metrics) return null;
+  if (!metrics) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <ShieldAlert className="h-4 w-4 text-amber-400" />
+        <span className="bento-card-title">Risk Metrikleri</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Henüz yeterli veri yok. Risk metrikleri en az 20 günlük veri gerektirir.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">
@@ -60,11 +69,8 @@ export function RiskMetricsSummary() {
             if (value == null) return null;
 
             let isGood = false;
-            if (m.invert) {
-              isGood = m.goodBelow != null ? value > m.goodBelow : false;
-            } else {
-              isGood = m.goodAbove != null ? value >= m.goodAbove : false;
-            }
+            if (m.goodAbove != null) isGood = value >= m.goodAbove;
+            else if (m.goodBelow != null) isGood = value <= m.goodBelow;
 
             return (
               <div key={m.key} className="p-3 rounded-xl bg-card/30 border border-border/15">

@@ -113,7 +113,17 @@ export function AllocationChart() {
   const allocation = data?.allocation ?? [];
   const sectorAllocation = data?.sectorAllocation ?? [];
 
-  if (allocation.length === 0) return null;
+  if (allocation.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <PieChart className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Dağılım</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Portföyünüzde henüz hisse bulunmuyor.</p>
+      </div>
+    </div>
+  );
 
   const items = view === "hisse"
     ? allocation.map((a: { stockCode: string; weight: number }) => ({ label: a.stockCode, value: a.weight }))

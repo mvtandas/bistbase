@@ -79,7 +79,12 @@ export function PortfolioVerdict() {
     );
   }
 
-  if (error || !data || !data.portfolioVerdict) return null;
+  if (error || !data || !data.portfolioVerdict) return (
+    <div className="rounded-2xl border border-border/30 bg-card/10 p-6 text-center">
+      <ShieldAlert className="h-8 w-8 mx-auto text-muted-foreground/30 mb-2" />
+      <p className="text-sm text-muted-foreground/60">Portföy analizi yüklenemedi. Lütfen sayfayı yenileyin.</p>
+    </div>
+  );
 
   const v = data.portfolioVerdict;
   const c = ACTION_CONFIG[v.action as VerdictAction];

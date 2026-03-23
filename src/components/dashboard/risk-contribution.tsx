@@ -40,7 +40,17 @@ export function RiskContribution() {
   const contributions: RiskContrib[] = data?.riskContributions ?? [];
   const correlations: Correlation[] = (data?.correlations ?? []).filter((c: Correlation) => Math.abs(c.correlation) > 0.7);
 
-  if (contributions.length === 0) return null;
+  if (contributions.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <ShieldAlert className="h-4 w-4 text-amber-400" />
+        <span className="bento-card-title">Risk Katkısı</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Risk katkısı hesaplamak için en az 2 hisse gerekli.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">

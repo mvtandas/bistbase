@@ -34,7 +34,17 @@ export function PortfolioAttribution() {
   if (isLoading) return <div className="bento-card"><div className="bento-card-body"><Skeleton className="h-40 w-full" /></div></div>;
 
   const attr: Attribution | null = data?.attribution ?? null;
-  if (!attr || attr.sectorDetails.length === 0) return null;
+  if (!attr || attr.sectorDetails.length === 0) return (
+    <div className="bento-card min-w-0">
+      <div className="bento-card-header">
+        <PieChart className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Performans Ayrıştırma</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Performans ayrıştırma verisi henüz mevcut değil.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up min-w-0">

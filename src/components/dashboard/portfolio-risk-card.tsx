@@ -36,7 +36,17 @@ export function PortfolioRiskCard() {
     );
   }
 
-  if (!data) return null;
+  if (!data) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Shield className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Portföy Risk</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Portföy risk verisi yüklenemedi.</p>
+      </div>
+    </div>
+  );
 
   const colors = ["bg-ai-primary", "bg-gain", "bg-amber-400", "bg-loss", "bg-violet-500", "bg-cyan-500"];
 

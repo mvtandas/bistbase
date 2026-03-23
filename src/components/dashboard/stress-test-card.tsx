@@ -31,7 +31,17 @@ export function StressTestCard() {
   }
 
   const stressTest = data?.stressTest;
-  if (!stressTest || stressTest.scenarios.length === 0) return null;
+  if (!stressTest || !stressTest.scenarios || stressTest.scenarios.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Zap className="h-4 w-4 text-amber-400" />
+        <span className="bento-card-title">Stres Testi</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Stres testi verisi mevcut değil.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">

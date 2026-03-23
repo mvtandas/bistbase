@@ -34,7 +34,17 @@ export function PerformanceCalendar() {
   }
 
   const curve = data?.equityCurve ?? [];
-  if (curve.length < 10) return null;
+  if (curve.length < 10) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Calendar className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Performans Takvimi</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Takvim görünümü için en az 10 günlük veri gerekli.</p>
+      </div>
+    </div>
+  );
 
   // Calculate daily returns from equity curve
   const dailyData: { date: string; returnPct: number }[] = [];

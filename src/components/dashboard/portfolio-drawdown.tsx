@@ -25,7 +25,17 @@ export function PortfolioDrawdown() {
   }
 
   const dd = data?.drawdown;
-  if (!dd || dd.drawdownSeries.length < 5) return null;
+  if (!dd || !dd.drawdownSeries || dd.drawdownSeries.length < 5) return (
+    <div className="bento-card min-w-0">
+      <div className="bento-card-header">
+        <Activity className="h-4 w-4 text-loss" />
+        <span className="bento-card-title">Drawdown Analizi</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Drawdown analizi için yeterli geçmiş veri yok.</p>
+      </div>
+    </div>
+  );
 
   const chartData = dd.drawdownSeries.map((p: { date: string; drawdown: number }) => ({
     time: p.date,

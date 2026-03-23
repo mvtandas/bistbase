@@ -61,10 +61,30 @@ export function PortfolioHealthGauge() {
     );
   }
 
-  if (isError || !data) return null;
+  if (isError || !data) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Shield className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Portföy Sağlığı</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Sağlık skoru hesaplanamadı.</p>
+      </div>
+    </div>
+  );
 
   const health = data?.healthScore;
-  if (!health) return null;
+  if (!health) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Shield className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Portföy Sağlığı</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Sağlık skoru henüz hesaplanmadı.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">

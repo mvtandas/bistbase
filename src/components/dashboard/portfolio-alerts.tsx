@@ -14,13 +14,13 @@ interface Alert {
 
 export function PortfolioAlerts() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = useQuery<any>({
+  const { data, isLoading } = useQuery<any>({
     queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
     queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
     staleTime: 5 * 60 * 1000,
   });
 
-  if (!data) return null;
+  if (isLoading || !data) return null;
 
   const alerts: Alert[] = [];
 

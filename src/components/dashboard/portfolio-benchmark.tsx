@@ -36,7 +36,17 @@ export function PortfolioBenchmark() {
   );
 
   const benchmarks: BenchmarkData[] = data?.benchmarkComparison ?? [];
-  if (benchmarks.length === 0) return null;
+  if (benchmarks.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <BarChart3 className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">BİST100 Karşılaştırma</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Benchmark karşılaştırma verisi henüz mevcut değil.</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bento-card animate-slide-up">

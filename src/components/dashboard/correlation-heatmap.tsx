@@ -35,7 +35,17 @@ export function CorrelationHeatmap() {
   const correlations: { pair: [string, string]; correlation: number }[] = data?.correlations ?? [];
   const holdings: { stockCode: string }[] = data?.holdings ?? [];
 
-  if (holdings.length < 3 || correlations.length === 0) return null;
+  if (holdings.length < 3 || correlations.length === 0) return (
+    <div className="bento-card">
+      <div className="bento-card-header">
+        <Grid3X3 className="h-4 w-4 text-ai-primary" />
+        <span className="bento-card-title">Korelasyon Matrisi</span>
+      </div>
+      <div className="bento-card-body flex items-center justify-center py-8">
+        <p className="text-xs text-muted-foreground/50">Korelasyon matrisi için en az 3 hisse gereklidir.</p>
+      </div>
+    </div>
+  );
 
   const codes = holdings.map(h => h.stockCode);
 
