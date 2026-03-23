@@ -382,14 +382,46 @@ function calculateFundamentalPillar(
 // PILLAR 3: MOMENTUM & AKIS
 // ═══════════════════════════════════════
 
+// Sinyal kalite çarpanı — BIST100 5Y backtest 10D WR bazında
+// WR >= 60%: 1.3x, WR 57-60%: 1.1x, WR 55-57%: 1.0x, WR 50-55%: 0.7x
+const SIGNAL_QUALITY: Record<string, number> = {
+  // Tier 1: WR >= 60% → 1.3x
+  "CHART_INVERSE_HEAD_SHOULDERS": 1.3,
+  "STRONG_UPTREND": 1.3,
+  "MA_STRONG_BULLISH": 1.3,
+  "CMF_ACCUMULATION": 1.3,
+  // Tier 2: WR 57-60% → 1.1x
+  "CHART_CUP_AND_HANDLE": 1.1,
+  "CANDLE_MORNING_STAR": 1.1,
+  "CHART_DOUBLE_BOTTOM": 1.1,
+  "CHART_SYMMETRICAL_TRIANGLE": 1.1,
+  "BB_UPPER_BREAK": 1.1,
+  "OBV_BULLISH_DIVERGENCE": 1.1,
+  // Tier 3: WR 55-57% → 1.0x (default)
+  // Tier 4: WR 50-55% → 0.7x
+  "STOCH_OVERSOLD": 0.7,
+  "CHART_FALLING_WEDGE": 0.7,
+  "MACD_BULLISH_CROSS": 0.7,
+  "RSI_OVERSOLD": 0.7,
+  "DIP_RECOVERY": 0.7,
+};
+
+function getSignalQuality(signalType: string): number {
+  // CANDLE_ ve CHART_ prefix'lerini de kontrol et
+  const clean = signalType.replace(/^(CANDLE_|CHART_)/, "");
+  return SIGNAL_QUALITY[signalType] ?? SIGNAL_QUALITY[clean] ?? 1.0;
+}
+
 function calculateFlowPillar(input: VerdictInput): FlowPillar {
   // Signal rating
   // BIST100 5Y backtest: Bullish sinyaller güçlü (%55-66 WR), bearish sinyaller zayıf (%43-50 WR)
   // Bearish weight'e %40 indirim uygula — BIST'in yapısal yükseliş bias'ını yansıtır
+  // Sinyal kalite çarpanı: yüksek WR sinyallere daha fazla ağırlık
   let bullWeight = 0, bearWeight = 0;
   let bullCount = 0, bearCount = 0;
   for (const s of input.signals) {
-    if (s.direction === "BULLISH") { bullWeight += s.strength; bullCount++; }
+    const q = getSignalQuality(s.type);
+    if (s.direction === "BULLISH") { bullWeight += s.strength * q; bullCount++; }
     else if (s.direction === "BEARISH") { bearWeight += s.strength * 0.6; bearCount++; } // %40 indirim
   }
   const totalSigWeight = bullWeight + bearWeight;
