@@ -63,7 +63,13 @@ function parseArgs() {
   const name = args.find(a => a.startsWith("--name="))?.split("=")[1]
     ?? args[args.indexOf("--name") + 1]
     ?? `system-${scope}`;
-  return { scope, name };
+  const from = args.find(a => a.startsWith("--from="))?.split("=")[1]
+    ?? args[args.indexOf("--from") + 1]
+    ?? null;
+  const to = args.find(a => a.startsWith("--to="))?.split("=")[1]
+    ?? args[args.indexOf("--to") + 1]
+    ?? null;
+  return { scope, name, from, to };
 }
 
 function getStockList(scope: string): string[] {
@@ -162,7 +168,7 @@ function colorVal(v: number, good: number, bad: number): string {
 // ═══ Main ═══
 
 async function main() {
-  const { scope, name } = parseArgs();
+  const { scope, name, from, to } = parseArgs();
   const stocks = getStockList(scope);
   const macro = loadMacro();
   const macroMap = macro ? buildMacroMap(macro) : null;
@@ -181,7 +187,9 @@ async function main() {
   const hasFundamentals = Object.keys(fundamentalScores).length > 0;
 
   console.log(`\n${B}═══ SİSTEM DOĞRULUK TESTİ: ${scope.toUpperCase()} ═══${X}`);
-  console.log(`Hisse: ${stocks.length} | Adım: ${name} | Fundamental: ${hasFundamentals ? `${Object.keys(fundamentalScores).length} hisse` : "YOK"}\n`);
+  console.log(`Hisse: ${stocks.length} | Adım: ${name} | Fundamental: ${hasFundamentals ? `${Object.keys(fundamentalScores).length} hisse` : "YOK"}`);
+  if (from || to) console.log(`Tarih aralığı: ${from ?? "başlangıç"} → ${to ?? "son"}`);
+  console.log();
 
   // ── Aggregators ──
 
@@ -225,6 +233,9 @@ async function main() {
     for (let i = startIdx; i < endIdx; i++) {
       const window = bars.slice(0, i + 1);
       const currentBar = bars[i];
+      // Tarih filtresi
+      if (from && currentBar.date < from) continue;
+      if (to && currentBar.date > to) continue;
       const price = currentBar.close;
       const volume = currentBar.volume;
 
