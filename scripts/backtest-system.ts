@@ -137,9 +137,10 @@ function buildMarketRegimeMap(bist100Bars: HistoricalBar[]): Map<string, "BULL" 
     const ret10 = ((current - prev10) / prev10) * 100;
     const ret20 = ((current - prev20) / prev20) * 100;
 
-    // BEAR: hem 10 hem 20 gün negatif, veya 20 gün -%5'ten fazla düşüş
-    if (ret10 < -2 && ret20 < -3) map.set(sorted[i].date, "BEAR");
-    else if (ret20 < -5) map.set(sorted[i].date, "BEAR");
+    // BEAR: 10 veya 20 gün negatif — erken tespit için gevşetilmiş eşikler
+    if (ret10 < -1 && ret20 < -2) map.set(sorted[i].date, "BEAR");
+    else if (ret20 < -4) map.set(sorted[i].date, "BEAR");
+    else if (ret10 < -3) map.set(sorted[i].date, "BEAR"); // kısa vadeli sert düşüş
     // BULL: hem 10 hem 20 gün pozitif
     else if (ret10 > 2 && ret20 > 3) map.set(sorted[i].date, "BULL");
     else map.set(sorted[i].date, "NEUTRAL");
