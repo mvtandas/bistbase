@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+
+export const maxDuration = 60;
 import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars } from "@/lib/stock/yahoo";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";

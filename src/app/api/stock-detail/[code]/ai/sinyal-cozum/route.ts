@@ -3,6 +3,8 @@ import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars } from "@/lib/stock/yahoo";
 import { getIstanbulToday } from "@/lib/date-utils";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
+
+export const maxDuration = 60;
 import { detectSignals } from "@/lib/stock/signals";
 import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";

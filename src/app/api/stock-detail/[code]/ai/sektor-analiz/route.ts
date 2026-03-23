@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { getIstanbulToday } from "@/lib/date-utils";
 import { getFundamentalData, scoreFundamentals } from "@/lib/stock/fundamentals";
+
+export const maxDuration = 60;
 import { getMacroData } from "@/lib/stock/macro";
 import { calculateSectorContext } from "@/lib/stock/sectors";
 import { getPeerComparison } from "@/lib/stock/peers";

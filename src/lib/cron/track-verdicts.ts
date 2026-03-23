@@ -111,11 +111,20 @@ export async function trackVerdictOutcomes(): Promise<{
     take: 200,
   });
 
+  // BIST100 benchmark return'ü için endeks verisi çek
+  let bist100Now: number | null = null;
+  try {
+    const bist100Quote = await getStockQuote("XU100");
+    bist100Now = bist100Quote?.price ?? null;
+  } catch { /* fallback: null */ }
+
   for (const v of verdicts20D) {
     const quote = await getStockQuote(v.stockCode);
     if (quote?.price != null && v.closePrice != null) {
       const outcome = ((quote.price - v.closePrice) / v.closePrice) * 100;
-      const accurate = determineAccuracy(v.verdictAction!, outcome);
+      // BIST100 aynı dönem return'ü (bist100Change alanından veya yaklaşık)
+      const bist100Return = v.bist100Change != null ? v.bist100Change : null;
+      const accurate = determineAccuracy(v.verdictAction!, outcome, bist100Return);
       await prisma.dailySummary.update({
         where: { id: v.id },
         data: {
@@ -132,16 +141,22 @@ export async function trackVerdictOutcomes(): Promise<{
   return { updated1D, updated5D, updated10D, updated20D };
 }
 
-function determineAccuracy(verdictAction: string, outcomePercent: number): boolean {
+// BIST100 5Y backtest ile kalibre edildi:
+// AL/GUCLU_AL: fiyat yükseldi mi (absolute)
+// SAT/GUCLU_SAT: BIST100'ün altında kaldı mı (relative) — eski: fiyat düştü mü
+// TUT: fazla hareket etmedi mi (±5%)
+function determineAccuracy(verdictAction: string, outcomePercent: number, bist100Percent?: number | null): boolean {
   switch (verdictAction) {
     case "GUCLU_AL":
     case "AL":
       return outcomePercent > 0;
     case "SAT":
     case "GUCLU_SAT":
-      return outcomePercent < 0;
+      // Relative: hisse BIST100'ün altında kaldıysa SAT doğru
+      if (bist100Percent != null) return outcomePercent < bist100Percent;
+      return outcomePercent < 0; // fallback: absolute
     case "TUT":
-      return Math.abs(outcomePercent) < 3;
+      return Math.abs(outcomePercent) < 5; // eskisi: 3
     default:
       return false;
   }

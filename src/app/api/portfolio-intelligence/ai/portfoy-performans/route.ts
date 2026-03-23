@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { cacheGet } from "@/lib/redis";
+
+export const maxDuration = 60;
 import { getIstanbulToday } from "@/lib/date-utils";
 import { generateSpecializedInsight } from "@/lib/ai/specialized";
 import { buildPortfoyPerformansPrompt } from "@/lib/ai/portfolio-prompts";

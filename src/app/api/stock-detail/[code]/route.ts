@@ -29,6 +29,8 @@ import { getUpcomingEvents } from "@/lib/data/economic-calendar";
 import { getSearchInterest } from "@/lib/stock/search-interest";
 import { getKAPFinancials } from "@/lib/data/kap";
 
+export const maxDuration = 60;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({
   suppressNotices: ["yahooSurvey", "ripHistorical"],

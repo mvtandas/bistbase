@@ -69,6 +69,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   alertPrefs    AlertPreference?
+  paperAccount  PaperAccount?
   aiDisclaimerAccepted Boolean @default(false)
 }
 
@@ -402,4 +403,104 @@ model SystemConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ---- v6: Paper Trading ----
+
+model PaperAccount {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  initialBalance  Float    @default(100000)
+  currentBalance  Float    @default(100000)
+  totalPnl        Float    @default(0)
+  totalTrades     Int      @default(0)
+  winCount        Int      @default(0)
+  lossCount       Int      @default(0)
+  totalCommission Float    @default(0)
+  maxDrawdown     Float    @default(0)
+  peakBalance     Float    @default(100000)
+  scope           String   @default("bist100") // bist30, bist50, bist100, portfolio
+  isActive        Boolean  @default(true)
+  // Circuit breaker durumu
+  pausedUntil     DateTime?
+  pauseReason     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades          PaperTrade[]
+  snapshots       PaperEquitySnapshot[]
+}
+
+model PaperTrade {
+  id              String    @id @default(cuid())
+  accountId       String
+  stockCode       String
+  action          String    // BUY, SELL
+  lots            Int
+  entryPrice      Float
+  exitPrice       Float?
+  stopLoss        Float
+  takeProfit      Float
+  trailingStop    Float?    // aktif trailing stop seviyesi
+  status          String    @default("OPEN") // OPEN, CLOSED_TP, CLOSED_SL, CLOSED_TRAIL, CLOSED_TIME, CLOSED_VERDICT, CLOSED_CIRCUIT
+  verdictAction   String    // Verdikt: GUCLU_AL, AL, SAT, GUCLU_SAT
+  confidence      Int       // 0-100
+  signalTypes     String?   // Tetikleyen sinyaller (virgülle ayrılmış)
+  // Exit
+  exitDate        DateTime?
+  exitReason      String?
+  pnlAmount       Float?    // TL
+  pnlPercent      Float?    // %
+  commission      Float?    // Toplam komisyon (alım+satım)
+  holdingDays     Int?
+  // Timing
+  entryDate       DateTime  @default(now())
+  maxHoldingDays  Int       @default(20)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  account         PaperAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, status])
+  @@index([stockCode, status])
+  @@index([entryDate])
+}
+
+model PaperEquitySnapshot {
+  id              String   @id @default(cuid())
+  accountId       String
+  date            DateTime @db.Date
+  portfolioValue  Float    // nakit + açık pozisyonlar
+  cashBalance     Float
+  openPositions   Int
+  dailyPnl        Float?
+  dailyPnlPct     Float?
+  drawdown        Float?   // peak'ten düşüş %
+  benchmarkValue  Float?   // BIST-100 karşılaştırma
+  createdAt       DateTime @default(now())
+  account         PaperAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, date])
+  @@index([accountId, date])
+}
+
+// ---- v7: Backtest Reports ----
+
+model BacktestReport {
+  id                  String   @id @default(cuid())
+  name                String   // "v1-bist100", "v2-filtered"
+  scope               String   // "bist100", "bist-all", "bist30"
+  totalStocks         Int
+  totalSignals        Int
+  totalVerdicts       Int
+  periodDays          Int?
+  avgWinRate          Float?
+  signalPerformance   Json     // { signalKey → { horizons } }
+  verdictPerformance  Json     // { action → { horizons } }
+  byIndex             Json?    // { indexName → { avgWinRate, signalCount } }
+  overall             Json?    // { avgWinRate, signalTypesAnalyzed }
+  meta                Json?    // { date, durationSeconds, ... }
+  createdAt           DateTime @default(now())
+
+  @@index([scope])
+  @@index([createdAt])
 }

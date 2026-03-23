@@ -16,6 +16,8 @@ import { AkilliOzetSchema } from "@/lib/ai/schemas";
 import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
 import { getPromptVersion } from "@/lib/ai/prompt-registry";
 
+export const maxDuration = 60;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
 

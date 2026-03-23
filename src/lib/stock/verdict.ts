@@ -384,13 +384,68 @@ function calculateFundamentalPillar(
 
 function calculateFlowPillar(input: VerdictInput): FlowPillar {
   // Signal rating
+  // BIST100 5Y backtest: Bullish sinyaller güçlü (%55-66 WR), bearish sinyaller zayıf (%43-50 WR)
+  // Bearish weight'e %40 indirim uygula — BIST'in yapısal yükseliş bias'ını yansıtır
   let bullWeight = 0, bearWeight = 0;
+  let bullCount = 0, bearCount = 0;
   for (const s of input.signals) {
-    if (s.direction === "BULLISH") bullWeight += s.strength;
-    else if (s.direction === "BEARISH") bearWeight += s.strength;
+    if (s.direction === "BULLISH") { bullWeight += s.strength; bullCount++; }
+    else if (s.direction === "BEARISH") { bearWeight += s.strength * 0.6; bearCount++; } // %40 indirim
   }
   const totalSigWeight = bullWeight + bearWeight;
-  const signalRating = totalSigWeight > 0 ? clamp((bullWeight - bearWeight) / totalSigWeight, -1, 1) : 0;
+  let signalRating = totalSigWeight > 0 ? clamp((bullWeight - bearWeight) / totalSigWeight, -1, 1) : 0;
+
+  // Confluence bonus: 3+ aynı yönde sinyal → daha güçlü verdict
+  if (bullCount >= 3 && signalRating > 0) signalRating = Math.min(1, signalRating * 1.2);
+  if (bearCount >= 3 && signalRating < 0) signalRating = Math.max(-1, signalRating * 1.15);
+
+  // ── Reversal Bonus ──
+  // Sert düşüş sonrası güçlü bullish sinyal → reversal fırsatı (TOASO %21 örneği)
+  // MACD_BULLISH_CROSS, RSI_OVERSOLD, STOCH_OVERSOLD gibi sinyaller düşüş sonrası daha değerli
+  const t = input.technicals as Record<string, unknown> | null;
+  const maAlignment = t?.maAlignment as string | undefined;
+  const stochK = t?.stochK as number | undefined;
+  const rsi14 = t?.rsi14 as number | undefined;
+
+  const hasBullishReversal = input.signals.some(s =>
+    s.direction === "BULLISH" && s.strength >= 60 &&
+    (s.type === "MACD_BULLISH_CROSS" || s.type === "RSI_OVERSOLD" || s.type === "RSI_BULLISH_DIVERGENCE" ||
+     s.type === "STOCH_OVERSOLD" || s.type === "MFI_OVERSOLD" || s.type === "GOLDEN_CROSS" ||
+     s.type === "DIP_RECOVERY")
+  );
+  const isOversold = (stochK != null && stochK < 25) || (rsi14 != null && rsi14 < 35);
+  const isBearishTrend = maAlignment === "STRONG_BEARISH" || maAlignment === "BEARISH";
+
+  if (hasBullishReversal && (isOversold || isBearishTrend)) {
+    // Düşüş trendinde/oversold'da reversal sinyal → bearish trend sinyallerini bastır
+    // MA_STRONG_BEARISH, STRONG_DOWNTREND gibi sinyaller reversal'da yanıltıcı
+    // Signal rating'i yeniden hesapla — bearish trend sinyallerini %80 indir
+    let adjBullW = 0, adjBearW = 0;
+    for (const s of input.signals) {
+      if (s.direction === "BULLISH") {
+        adjBullW += s.strength;
+      } else if (s.direction === "BEARISH") {
+        const isTrendSignal = s.type.includes("STRONG_") || s.type.includes("MA_STRONG") || s.type === "DEATH_CROSS";
+        adjBearW += s.strength * (isTrendSignal ? 0.12 : 0.6); // trend sinyallerini %88 indir
+      }
+    }
+    const adjTotal = adjBullW + adjBearW;
+    signalRating = adjTotal > 0 ? clamp((adjBullW - adjBearW) / adjTotal, -1, 1) : signalRating;
+    signalRating = Math.min(1, signalRating + 0.15); // ek reversal boost
+  }
+
+  // ── Momentum Breakout Bonus ──
+  // Fiyat MA20 üstünde + hacim ortalamanın üstünde → momentum var, bearish ignore et
+  // (SASA %35, SKBNK %43 örnekleri — fiyat yükseliyor ama bearish sinyal AL'ı engelliyor)
+  const priceAboveMA20 = t?.ma20 != null && input.price != null && input.price > (t.ma20 as number);
+  const priceAboveMA50 = t?.ma50 != null && input.price != null && input.price > (t.ma50 as number);
+  const volumeRatio = t?.volumeRatio as number | undefined;
+  const hasHighVolume = volumeRatio != null && volumeRatio >= 1.3;
+
+  if (priceAboveMA20 && priceAboveMA50 && hasHighVolume && signalRating < 0.3) {
+    // Fiyat iki MA'nın üstünde + yüksek hacim → momentum, bearish gürültüyü ignore et
+    signalRating = Math.max(signalRating, 0.15);
+  }
 
   // Volume rating
   const volumeRating = input.score ? clamp((input.score.volume - 50) / 50, -1, 1) : 0;
@@ -506,26 +561,28 @@ function applyRiskAdjustment(rawScore: number, risk: VerdictInput["riskMetrics"]
 
   penalty = Math.min(penalty, 0.35);
 
-  // Asimetrik risk ayarlaması:
-  // Boğa sinyalinde (score > 0) yüksek risk → daha sert ceza (risk sinyale çelişiyor)
-  // Ayı sinyalinde (score < 0) yüksek risk → daha hafif ceza (risk sinyali doğruluyor)
+  // Simetrik risk ayarlaması (BIST100 5Y backtest ile kalibre edildi):
+  // Eski: AL 1.5x ceza, SAT 0.7x ödül → AL'ı haksız zayıflıyordu
+  // Yeni: Her iki yöne eşit ceza. BIST'te AL %60.8 WR, SAT %46.5 WR — AL güçlü.
+  // Risk yüksekse her iki yönde de temkinli ol.
   if (rawScore > 0) {
-    // Boğa + yüksek risk = çelişki → %50 daha fazla ceza
-    return rawScore * (1 - penalty * 1.5);
+    return rawScore * (1 - penalty);
   }
-  // Ayı + yüksek risk = uyum → standart ceza (risk zaten SAT yönünde)
-  return rawScore * (1 + penalty * 0.7);
+  return rawScore * (1 + penalty * 0.5);
 }
 
 // ═══════════════════════════════════════
 // VERDICT THRESHOLDS
 // ═══════════════════════════════════════
 
+// BIST100 5Y backtest ile kalibre edildi:
+// AL %60.8 WR → eşik hafif düşürüldü (daha fazla AL yakalansın)
+// SAT %46.5 WR → eşik yükseltildi (daha güçlü kanıt gereksin)
 function scoreToAction(score: number): VerdictAction {
-  if (score >= 0.50) return "GUCLU_AL";
-  if (score >= 0.20) return "AL";
-  if (score > -0.20) return "TUT";
-  if (score > -0.50) return "SAT";
+  if (score >= 0.45) return "GUCLU_AL";  // eskisi: 0.50
+  if (score >= 0.15) return "AL";         // eskisi: 0.20
+  if (score > -0.30) return "TUT";        // eskisi: -0.20 (TUT aralığı genişledi)
+  if (score > -0.60) return "SAT";        // eskisi: -0.50 (SAT için daha güçlü sinyal gerekli)
   return "GUCLU_SAT";
 }
 

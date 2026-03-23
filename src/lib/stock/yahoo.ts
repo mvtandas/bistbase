@@ -109,7 +109,10 @@ export async function getHistoricalBars(
       low: (bar.low as number) ?? 0,
       volume: (bar.volume as number) ?? 0,
     }));
-    await cacheSet(cacheKey, bars, 900); // 15 min
+    // Only cache non-empty results to avoid propagating temporary Yahoo failures
+    if (bars.length > 0) {
+      await cacheSet(cacheKey, bars, 900); // 15 min
+    }
     return bars;
   } catch (error) {
     console.error(`Historical data error for ${symbol}:`, error);
@@ -146,7 +149,10 @@ export async function getHistoricalBarsInterval(
       low: (bar.low as number) ?? 0,
       volume: (bar.volume as number) ?? 0,
     }));
-    await cacheSet(cacheKey, bars, 1800); // 30 min
+    // Only cache non-empty results to avoid propagating temporary Yahoo failures
+    if (bars.length > 0) {
+      await cacheSet(cacheKey, bars, 1800); // 30 min
+    }
     return bars;
   } catch (error) {
     console.error(`Historical interval data error for ${symbol}:`, error);

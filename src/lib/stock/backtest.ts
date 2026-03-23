@@ -5,6 +5,13 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { ROUND_TRIP_COST } from "./bist-constants";
+
+/** Tahmini slippage oranı — küçük/orta sermaye BIST hisseleri için */
+const ESTIMATED_SLIPPAGE = 0.003; // %0.3
+
+/** Toplam işlem maliyeti = komisyon + slippage */
+const TOTAL_TRADE_COST = ROUND_TRIP_COST + ESTIMATED_SLIPPAGE;
 
 // ═══ Types ═══
 
@@ -14,6 +21,9 @@ export interface TimeHorizonStats {
   avgLossPct: number;    // ortalama kayıp % (negatif)
   profitFactor: number;  // toplam kazanç / toplam kayıp (>1 = kârlı)
   sampleSize: number;
+  grossExpectancy: number;  // komisyon öncesi beklenen getiri per trade
+  netExpectancy: number;    // komisyon + slippage sonrası beklenen getiri
+  netProfitFactor: number;  // komisyon + slippage düşülmüş profit factor
 }
 
 export interface StreakStats {
@@ -66,7 +76,7 @@ function calcHorizonStats(
   signals: { outcome: number | null; direction: string }[],
 ): TimeHorizonStats {
   const valid = signals.filter(s => s.outcome != null) as { outcome: number; direction: string }[];
-  if (valid.length === 0) return { winRate: 0, avgWinPct: 0, avgLossPct: 0, profitFactor: 0, sampleSize: 0 };
+  if (valid.length === 0) return { winRate: 0, avgWinPct: 0, avgLossPct: 0, profitFactor: 0, sampleSize: 0, grossExpectancy: 0, netExpectancy: 0, netProfitFactor: 0 };
 
   const wins: number[] = [];
   const losses: number[] = [];
@@ -85,12 +95,25 @@ function calcHorizonStats(
   const grossLosses = losses.reduce((a, b) => a + b, 0);
   const profitFactor = grossLosses > 0 ? Math.min(999, grossWins / grossLosses) : (grossWins > 0 ? 999 : 0);
 
+  // Komisyon + slippage düşülmüş metrikler
+  const tradeCostPct = TOTAL_TRADE_COST * 100; // %0.695
+  const grossExpectancy = (winRate / 100) * avgWinPct - ((100 - winRate) / 100) * avgLossPct;
+  const netExpectancy = grossExpectancy - tradeCostPct;
+
+  // Net profit factor: kazançlardan maliyet düşülür
+  const netWins = Math.max(0, grossWins - valid.length * tradeCostPct);
+  const netLosses = grossLosses + valid.length * tradeCostPct;
+  const netProfitFactor = netLosses > 0 ? Math.min(999, netWins / netLosses) : (netWins > 0 ? 999 : 0);
+
   return {
     winRate: Math.round(winRate * 10) / 10,
     avgWinPct: Math.round(avgWinPct * 100) / 100,
     avgLossPct: Math.round(avgLossPct * 100) / 100,
     profitFactor: Math.round(profitFactor * 100) / 100,
     sampleSize: valid.length,
+    grossExpectancy: Math.round(grossExpectancy * 100) / 100,
+    netExpectancy: Math.round(netExpectancy * 100) / 100,
+    netProfitFactor: Math.round(netProfitFactor * 100) / 100,
   };
 }
 

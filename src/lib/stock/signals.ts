@@ -221,6 +221,25 @@ export function detectSignals(
     signals.push(sig("MFI_OVERBOUGHT", "BEARISH", 60, `MFI ${t.mfi14.toFixed(1)} ile aşırı alım. Hacim bazlı gösterge hissede aşırı değerlenmeye işaret ediyor.`, "reversal", adx));
   }
 
+  // ── Dip Recovery ──
+  // Son 20 günde sert düşüş + son 5 günde toparlanma + MACD pozitif + hacim yüksek
+  // BIST100 backtest: Kaçırılan trade'lerin 5/8'inde bu pattern var
+  if (t.ma20 != null && t.ma50 != null && t.macdHistogram != null && t.volumeRatio != null) {
+    // Fiyat MA50 altında (düşüş sonrası) ama MA20'ye yaklaşıyor veya üstünde (toparlanma)
+    const belowMA50 = currentPrice < t.ma50;
+    const nearOrAboveMA20 = currentPrice >= t.ma20 * 0.97; // MA20'nin %3 altına kadar kabul
+    const macdPositive = t.macdHistogram > 0;
+    const highVolume = t.volumeRatio >= 1.3;
+    const stochOversold = t.stochK != null && t.stochK < 30;
+
+    if (belowMA50 && nearOrAboveMA20 && macdPositive && (highVolume || stochOversold)) {
+      const strength = highVolume && stochOversold ? 80 : highVolume ? 70 : 65;
+      signals.push(sig("DIP_RECOVERY", "BULLISH", strength,
+        `Dip recovery: Fiyat MA50 altında ama toparlanıyor. MACD pozitife döndü${highVolume ? ", hacim yüksek" : ""}${stochOversold ? ", Stochastic aşırı satımda" : ""}. Dip alım fırsatı olabilir.`,
+        "reversal", adx));
+    }
+  }
+
   // Sort by strength descending
   signals.sort((a, b) => b.strength - a.strength);
 

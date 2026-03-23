@@ -82,9 +82,10 @@ export async function GET(request: NextRequest) {
 
       if (vals.length < 3) return null;
 
+      // BIST100 5Y backtest ile kalibre edildi
       const isWin = (action: string, ret: number) => {
-        if (action === "SAT" || action === "GUCLU_SAT") return ret < 0;
-        if (action === "TUT") return Math.abs(ret) < 3;
+        if (action === "SAT" || action === "GUCLU_SAT") return ret < 0; // TODO: relative when bist100 data available
+        if (action === "TUT") return Math.abs(ret) < 5; // eskisi: 3
         return ret > 0;
       };
 

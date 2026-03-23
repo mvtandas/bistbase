@@ -127,11 +127,14 @@ function scoreTechnical(t: FullTechnicalData, price: number): number {
     else if (t.rsi14 >= 40 && t.rsi14 <= 60) score += 10;
   }
 
+  // MA alignment scoring — BIST100 5Y backtest ile kalibre edildi
+  // BIST'te bearish trend cezası azaltıldı: düşüşler kısa, toparlanmalar hızlı
+  // Kaçırılan trade analizi: MA_STRONG_BEARISH -25 cezası dip recovery'leri engelliyor
   switch (t.maAlignment) {
     case "STRONG_BULLISH": score += 25; break;
     case "BULLISH": score += 15; break;
-    case "BEARISH": score -= 15; break;
-    case "STRONG_BEARISH": score -= 25; break;
+    case "BEARISH": score -= 10; break;   // eskisi: -15
+    case "STRONG_BEARISH": score -= 15; break;  // eskisi: -25
   }
 
   if (t.support != null && t.resistance != null && price > 0) {

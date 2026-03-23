@@ -14,6 +14,8 @@ import {
   LogOut,
   Target,
   Shield,
+  Zap,
+  Bot,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -27,8 +29,13 @@ const navItems = [
   { href: "/dashboard", label: "Portföyüm", icon: LayoutDashboard },
   { href: "/dashboard/tarama", label: "Piyasa Taraması", icon: BarChart3 },
   { href: "/dashboard/explore", label: "Keşfet", icon: Compass },
-  { href: "/dashboard/backtest", label: "Karar Performansı", icon: Target },
   { href: "/dashboard/profile", label: "Profil", icon: User },
+];
+
+const adminNavItems = [
+  { href: "/dashboard/backtest", label: "Karar Performansı", icon: Target },
+  { href: "/dashboard/performance", label: "Sinyal Performansı", icon: Zap },
+  { href: "/dashboard/paper-trading", label: "Paper Trading", icon: Bot },
 ];
 
 export function Sidebar({ userEmail, userPlan, userRole, portfolioStocks }: SidebarProps) {
@@ -97,15 +104,39 @@ export function Sidebar({ userEmail, userPlan, userRole, portfolioStocks }: Side
         )}
       </nav>
 
-      {/* Admin link */}
+      {/* Admin-only pages */}
       {userRole === "ADMIN" && (
-        <Link
-          href="/admin"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-orange-400 hover:bg-orange-400/10 transition-colors"
-        >
-          <Shield className="h-4 w-4" />
-          Admin Panel
-        </Link>
+        <>
+          <Separator className="my-2" />
+          <p className="px-3 py-1 text-xs font-medium text-orange-400/70 uppercase tracking-wider">
+            Admin
+          </p>
+          {adminNavItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                  isActive
+                    ? "bg-orange-400/10 text-orange-400"
+                    : "text-orange-400/60 hover:bg-orange-400/10 hover:text-orange-400"
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-orange-400/60 hover:bg-orange-400/10 hover:text-orange-400 transition-colors"
+          >
+            <Shield className="h-4 w-4" />
+            Admin Panel
+          </Link>
+        </>
       )}
 
       {/* Sign out */}

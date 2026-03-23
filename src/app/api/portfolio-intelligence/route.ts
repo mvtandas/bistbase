@@ -24,6 +24,8 @@ import { runMonteCarloSimulation } from "@/lib/stock/monte-carlo";
 import { calculateStressTest } from "@/lib/stock/stress-test";
 import { cacheGet, cacheSet } from "@/lib/redis";
 
+export const maxDuration = 120;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const yf = new (YahooFinance as any)({ suppressNotices: ["yahooSurvey", "ripHistorical"] });
 

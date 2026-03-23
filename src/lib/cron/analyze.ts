@@ -18,6 +18,7 @@ import { analyzeSignalCombinations } from "@/lib/stock/signal-combinations";
 import { analyzeMultiTimeframe } from "@/lib/stock/multi-timeframe";
 import { calculateBacktest } from "@/lib/stock/backtest";
 import { filterSignals } from "@/lib/stock/signal-filter";
+import { BIST30 } from "@/lib/constants";
 import { getIstanbulToday, toIstanbulDateUTC } from "@/lib/date-utils";
 
 async function sleep(ms: number) {
@@ -34,14 +35,16 @@ export async function runDailyAnalysis(): Promise<{
   let skipped = 0;
   let failed = 0;
 
-  const stocks = await prisma.portfolio.findMany({
+  // Analiz kapsamı: BIST30 + portföydeki hisseler
+  // Paper trading ve sinyal performans takibi için BIST30 her gün analiz edilmeli
+  const portfolioStocks = await prisma.portfolio.findMany({
     distinct: ["stockCode"],
     select: { stockCode: true },
   });
+  const portfolioCodes = portfolioStocks.map((s) => s.stockCode);
+  const stockCodes = [...new Set([...BIST30, ...portfolioCodes])];
 
-  if (stocks.length === 0) return { processed: 0, skipped: 0, failed: 0 };
-
-  const stockCodes = stocks.map((s) => s.stockCode);
+  if (stockCodes.length === 0) return { processed: 0, skipped: 0, failed: 0 };
 
   const existing = await prisma.dailySummary.findMany({
     where: { date: today, stockCode: { in: stockCodes }, status: "COMPLETED" },

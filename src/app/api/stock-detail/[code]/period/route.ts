@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 import { getHistoricalBars, getHistoricalBarsInterval } from "@/lib/stock/yahoo";
+
+export const maxDuration = 60;
 import { getIstanbulToday } from "@/lib/date-utils";
 import { calculateFullTechnicals } from "@/lib/stock/technicals";
 import { calculateCompositeScore } from "@/lib/stock/scoring";
