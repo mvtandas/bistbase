@@ -44,24 +44,8 @@ export async function GET(req: NextRequest) {
   let skipped = 0;
 
   try {
-    // 1. Check what's already done today (range query for timezone safety)
-    const tomorrowDate = new Date(todayDate);
-    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
-    const existing = await prisma.screenerSnapshot.findMany({
-      where: { date: { gte: todayDate, lt: tomorrowDate } },
-      select: { stockCode: true },
-    });
-    const existingSet = new Set(existing.map(s => s.stockCode));
-
-    const toAnalyze = BIST_ALL.filter(code => !existingSet.has(code));
-    skipped = existingSet.size;
-
-    if (toAnalyze.length === 0) {
-      return NextResponse.json({
-        message: "Tüm hisseler zaten analiz edilmiş",
-        stats: { processed: 0, skipped, failed: 0, total: BIST_ALL.length },
-      });
-    }
+    // Always re-analyze all stocks — screener runs 3x daily to capture intraday changes
+    const toAnalyze = BIST_ALL;
 
     // 2. Shared macro data (one call for all stocks)
     const macroData = await getMacroData().catch(() => null);
