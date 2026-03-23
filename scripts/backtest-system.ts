@@ -55,20 +55,20 @@ const SCORE_RANGES = ["0-40", "40-48", "48-55", "55-100"] as const;
 
 // ═══ Helpers (backtest.ts ile aynı) ═══
 
+function getArg(args: string[], key: string, fallback: string | null = null): string | null {
+  const eq = args.find(a => a.startsWith(`--${key}=`));
+  if (eq) return eq.split("=")[1];
+  const idx = args.indexOf(`--${key}`);
+  if (idx >= 0 && idx + 1 < args.length) return args[idx + 1];
+  return fallback;
+}
+
 function parseArgs() {
   const args = process.argv.slice(2);
-  const scope = args.find(a => a.startsWith("--scope="))?.split("=")[1]
-    ?? args[args.indexOf("--scope") + 1]
-    ?? "bist100";
-  const name = args.find(a => a.startsWith("--name="))?.split("=")[1]
-    ?? args[args.indexOf("--name") + 1]
-    ?? `system-${scope}`;
-  const from = args.find(a => a.startsWith("--from="))?.split("=")[1]
-    ?? args[args.indexOf("--from") + 1]
-    ?? null;
-  const to = args.find(a => a.startsWith("--to="))?.split("=")[1]
-    ?? args[args.indexOf("--to") + 1]
-    ?? null;
+  const scope = getArg(args, "scope", "bist100")!;
+  const name = getArg(args, "name", `system-${scope}`)!;
+  const from = getArg(args, "from");
+  const to = getArg(args, "to");
   return { scope, name, from, to };
 }
 
@@ -119,6 +119,30 @@ function buildMacroMap(macro: Record<string, HistoricalBar[]>) {
     if (usdTryChange != null) macroScore -= Math.min(10, Math.max(-10, usdTryChange * 5));
     macroScore = Math.max(0, Math.min(100, macroScore));
     map.set(date, { vix, bist100Change, usdTryChange, macroScore });
+  }
+  return map;
+}
+
+// BIST100 piyasa rejimi tespiti: 10 ve 20 günlük return'e bakarak BULL/BEAR/NEUTRAL
+function buildMarketRegimeMap(bist100Bars: HistoricalBar[]): Map<string, "BULL" | "BEAR" | "NEUTRAL"> {
+  const map = new Map<string, "BULL" | "BEAR" | "NEUTRAL">();
+  const sorted = [...bist100Bars].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (let i = 20; i < sorted.length; i++) {
+    const current = sorted[i].close;
+    const prev10 = sorted[i - 10]?.close;
+    const prev20 = sorted[i - 20]?.close;
+    if (!current || !prev10 || !prev20) continue;
+
+    const ret10 = ((current - prev10) / prev10) * 100;
+    const ret20 = ((current - prev20) / prev20) * 100;
+
+    // BEAR: hem 10 hem 20 gün negatif, veya 20 gün -%5'ten fazla düşüş
+    if (ret10 < -2 && ret20 < -3) map.set(sorted[i].date, "BEAR");
+    else if (ret20 < -5) map.set(sorted[i].date, "BEAR");
+    // BULL: hem 10 hem 20 gün pozitif
+    else if (ret10 > 2 && ret20 > 3) map.set(sorted[i].date, "BULL");
+    else map.set(sorted[i].date, "NEUTRAL");
   }
   return map;
 }
@@ -175,6 +199,9 @@ async function main() {
   const bist100Map: Map<string, number> | null = macro?.bist100
     ? new Map(macro.bist100.filter((b: HistoricalBar) => b.close > 0).map((b: HistoricalBar) => [b.date, b.close]))
     : null;
+
+  // Piyasa rejimi haritası
+  const marketRegimeMap = macro?.bist100 ? buildMarketRegimeMap(macro.bist100) : null;
 
   // Fundamental veri yükle (statik — tüm barlar için aynı skor kullanılır)
   const fundamentalsRaw = loadFundamentals();
@@ -278,6 +305,7 @@ async function main() {
           macroData,
           riskMetrics: null,
           sentimentValue: 0,
+          marketRegime: marketRegimeMap?.get(currentBar.date) ?? null,
         });
       } catch { /* skip */ }
 

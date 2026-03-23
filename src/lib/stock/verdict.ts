@@ -96,6 +96,8 @@ export interface VerdictInput {
   signalAccuracy: Record<string, { rate: number; count: number }>;
   multiTimeframe: { weekly: { trend: string }; daily: { trend: string | null }; alignment: string } | null;
   macroData: { vix: number | null; bist100Change: number | null; usdTryChange: number | null; macroScore: number } | null;
+  /** Piyasa rejimi — BEAR'de AL verdiktleri bastırılır */
+  marketRegime?: "BULL" | "BEAR" | "NEUTRAL" | null;
   riskMetrics: { var95Daily: number | null; currentDrawdown: number | null; riskLevel: string | null; liquidityScore: number | null; stressTests: { estimatedLoss: number }[] } | null;
   sentimentValue?: number | null;
   signalBacktest?: { performances: { signalType: string; horizon1D: { winRate: number; profitFactor: number; sampleSize: number }; bestHorizon: string; confidenceScore: number; streaks: { maxConsecutiveLosses: number } }[] } | null;
@@ -877,8 +879,15 @@ export function calculateVerdict(input: VerdictInput): Verdict {
   const adjustedScore = applyRiskAdjustment(rawScore, input.riskMetrics);
   const score = clamp(adjustedScore, -1, 1);
 
-  // 5. Action
-  const action = scoreToAction(score);
+  // 5. Action (+ piyasa rejimi filtresi)
+  let action = scoreToAction(score);
+
+  // BEAR rejiminde AL verdiktlerini bastır — ayı piyasasında AL vermek zararlı
+  // Mart-Nisan 2025 backtest: AL %39.2 WR (normal: %59.5)
+  if (input.marketRegime === "BEAR") {
+    if (action === "GUCLU_AL") action = "TUT";
+    else if (action === "AL") action = "TUT";
+  }
 
   // 6. Confidence
   const confidence = calculateConfidence(technical, fundamental, flow, score, input);
