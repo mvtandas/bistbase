@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
             await prisma.screenerSnapshot.upsert({
               where: { stockCode_date: { stockCode: code, date: todayDate } },
               create: data,
-              update: data,
+              update: { ...data, createdAt: new Date() },
             });
             processed++;
           } catch (dbErr) {
