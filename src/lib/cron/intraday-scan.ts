@@ -276,7 +276,7 @@ async function processStock(
         stockCode, price: result.price, changePercent: result.changePercent, volume: result.volume,
         newsHeadlines: headlines, date: today.toISOString().split("T")[0],
         technicals: result.technicals, compositeScore: result.compositeScore,
-        signals: result.allSignals, sectorContext: result.sectorContext,
+        signals: result.filteredSignals, sectorContext: result.sectorContext, // FIX: allSignals → filteredSignals
         fundamentals: result.fundamentalData, fundamentalScore: result.fundScore,
         macroData: result.macroData, riskMetrics: result.riskMetrics,
         candlestickPatterns: result.candlestickPatterns, chartPatterns: result.chartPatterns,
@@ -360,7 +360,7 @@ function buildStockDetailCache(r: StockAnalysisResult) {
     volume: r.volume,
     technicals: r.technicals,
     score: r.compositeScore,
-    signals: r.allSignals,
+    signals: r.filteredSignals, // FIX: allSignals → filteredSignals
     verdict: r.verdict,
     fundamentalScore: r.fundScore,
     financials: {

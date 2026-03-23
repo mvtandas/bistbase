@@ -22,6 +22,7 @@ import { detectCandlestickPatterns } from "./candlesticks";
 import { detectChartPatterns } from "./chart-patterns";
 import { detectSignalChains } from "./signal-chains";
 import { calculateBacktest } from "./backtest";
+import { filterSignals, BLACKLISTED_SIGNALS } from "./signal-filter";
 
 // ═══════════════════════════════════════
 // TYPES
@@ -214,6 +215,12 @@ export async function analyzeStock(
     signals.push(...signalChainSignals);
   } catch { /* continue without chains */ }
 
+  // 3g. Sinyal filtreleme (blacklist + cooldown + hacim)
+  const avgVolumeTL = volume && price ? volume * price / 20 : null;
+  const { filtered: filteredSignals } = await filterSignals(signals, {
+    stockCode: code, date: new Date(), avgVolumeTL,
+  });
+
   // 4. Fundamentals
   const fundScore = safe(
     () => fundamentalData ? scoreFundamentals(fundamentalData) : null,
@@ -297,7 +304,7 @@ export async function analyzeStock(
         healthScore: fundScore.healthScore,
         fundamentalScore: fundScore.fundamentalScore,
       } : null,
-      signals,
+      signals: filteredSignals,  // FIX: eskisi: signals (filtrelenmemiş) → verdict blacklisted sinyallerle hesaplanıyordu
       signalCombination: signalCombination ? {
         totalBullish: signalCombination.totalBullish,
         totalBearish: signalCombination.totalBearish,
@@ -353,7 +360,7 @@ export async function analyzeStock(
     fiftyTwoWeekLow: fundamentalData?.fiftyTwoWeekLow ?? null,
     fromFiftyTwoHigh: fundamentalData?.fromFiftyTwoHigh ?? null,
     riskMetrics,
-    signals,
+    signals: filteredSignals,
     signalCombination,
     multiTimeframe,
     sectorCode,

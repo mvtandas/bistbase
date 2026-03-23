@@ -201,7 +201,14 @@ export async function analyzeStockFull(
     signalAccuracyRecord[key] = { rate: val.accuracyRate, count: val.totalCount };
   }
 
-  // ── 12: Verdict ──
+  // ── 12: Sinyal filtreleme (verdict'ten ÖNCE — blacklisted sinyaller verdict'i bozuyordu) ──
+  const filterDate = options.filterDate ?? new Date();
+  const avgVolumeTL = volume && price ? volume * price / 20 : null;
+  const { filtered: filteredSignals } = await filterSignals(allSignals, {
+    stockCode: code, date: filterDate, avgVolumeTL,
+  });
+
+  // ── 13: Verdict ──
   let verdict: Verdict | null = null;
   try {
     verdict = calculateVerdict({
@@ -214,7 +221,7 @@ export async function analyzeStockFull(
         growthScore: fundScore.growthScore, healthScore: fundScore.healthScore,
         fundamentalScore: fundScore.fundamentalScore,
       } : null,
-      signals: allSignals,
+      signals: filteredSignals,  // FIX: eskisi: allSignals
       signalCombination: signalCombination ? {
         totalBullish: signalCombination.totalBullish, totalBearish: signalCombination.totalBearish,
         confluenceType: signalCombination.confluenceType, conflicting: signalCombination.conflicting,
@@ -238,13 +245,6 @@ export async function analyzeStockFull(
       signalBacktest,
     });
   } catch { /* continue without verdict */ }
-
-  // ── 13: Sinyal filtreleme ──
-  const filterDate = options.filterDate ?? new Date();
-  const avgVolumeTL = volume && price ? volume * price / 20 : null;
-  const { filtered: filteredSignals } = await filterSignals(allSignals, {
-    stockCode: code, date: filterDate, avgVolumeTL,
-  });
 
   return {
     code,
