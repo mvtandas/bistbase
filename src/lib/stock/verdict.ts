@@ -343,6 +343,9 @@ function calculateTechnicalPillar(t: Record<string, unknown> | null, extra: Verd
 // PILLAR 2: TEMEL
 // ═══════════════════════════════════════
 
+// Fundamental score → pillar rating dönüşümü
+// v9-v11 karşılaştırma: orijinal sert cezalar en iyi sonuçları verdi
+// Düşük fundamental → SAT kararlarını güçlendiriyor (%60.9 WR)
 function scoreToRating(score: number): number {
   if (score >= 70) return 1;
   if (score >= 60) return 0.5;
