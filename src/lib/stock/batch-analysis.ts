@@ -4,9 +4,8 @@
  * stock-detail/[code]/route.ts mantığını batch olarak çalıştırır
  */
 
-import YahooFinance from "yahoo-finance2";
 import { STOCK_LISTS, type ScreenerIndex } from "@/lib/constants";
-import { getHistoricalBars, getHistoricalBarsInterval } from "./yahoo";
+import { getHistoricalBars, getHistoricalBarsInterval, getStockQuote } from "./yahoo";
 import { calculateFullTechnicals, type Timeframe } from "./technicals";
 import { calculateCompositeScore, detectVolatilityRegime, type CompositeScore, type VolatilityRegime } from "./scoring";
 import { detectSignals, type DetectedSignal } from "./signals";
@@ -18,11 +17,11 @@ import { analyzeMultiTimeframe, type TimeframeAnalysis } from "./multi-timeframe
 import { calculateExtraIndicators, type ExtraIndicators } from "./extra-indicators";
 import { calculateVerdict, type Verdict, type VerdictInput } from "./verdict";
 import { STOCK_SECTOR_MAP, SECTOR_INDICES } from "./sectors";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const yf = new (YahooFinance as any)({
-  suppressNotices: ["yahooSurvey", "ripHistorical"],
-});
+import { getSignalAccuracyMap, calibrateSignalStrength } from "./signal-calibration";
+import { detectCandlestickPatterns } from "./candlesticks";
+import { detectChartPatterns } from "./chart-patterns";
+import { detectSignalChains } from "./signal-chains";
+import { calculateBacktest } from "./backtest";
 
 // ═══════════════════════════════════════
 // TYPES
@@ -128,6 +127,7 @@ export async function analyzeStock(
   code: string,
   macroData: MacroData | null,
   timeframe: ScreenerTimeframe = "daily",
+  accuracyMap?: Map<string, { accuracyRate: number; totalCount: number; adjustedStrength: number; reliabilityLabel: string; signalType: string; accurateCount: number }>,
 ): Promise<ScreenerStockResult> {
   // 1. Fetch data in parallel
   const barsPromise = timeframe === "daily"
@@ -135,14 +135,14 @@ export async function analyzeStock(
     : getHistoricalBarsInterval(code, timeframe === "weekly" ? "1wk" : "1mo", timeframe === "weekly" ? 730 : 2190).catch(() => []);
 
   const [quote, bars, fundamentalData] = await Promise.all([
-    yf.quote(`${code}.IS`).catch(() => null),
+    getStockQuote(code),
     barsPromise,
     getFundamentalData(code).catch(() => null),
   ]);
 
-  const price = quote?.regularMarketPrice ?? null;
-  const changePercent = quote?.regularMarketChangePercent ?? null;
-  const volume = quote?.regularMarketVolume ?? null;
+  const price = quote?.price ?? null;
+  const changePercent = quote?.changePercent ?? null;
+  const volume = quote?.volume ?? null;
 
   // 2. Technicals (timeframe-aware)
   const tfKey: Timeframe = timeframe;
@@ -151,11 +151,68 @@ export async function analyzeStock(
     null,
   );
 
-  // 3. Signals
-  const signals = safe(
+  // 3. Signals (tam pipeline — daily analysis ile aynı)
+  const rawSignals = safe(
     () => technicals && price ? detectSignals(technicals, price) : [],
     [] as DetectedSignal[],
   );
+
+  // 3b. Candlestick patterns
+  const candlesticks = safe(() => detectCandlestickPatterns(bars), []);
+  for (const cp of candlesticks) {
+    rawSignals.push({
+      type: `CANDLE_${cp.name}`,
+      direction: cp.direction,
+      strength: cp.strength,
+      description: cp.description,
+    });
+  }
+
+  // 3c. Chart patterns
+  const chartPatterns = safe(() => detectChartPatterns(bars), []);
+  for (const cp of chartPatterns) {
+    rawSignals.push({
+      type: `CHART_${cp.name}`,
+      direction: cp.direction,
+      strength: cp.strength,
+      description: cp.description,
+    });
+  }
+
+  // 3d. Extra indicators (TTM Squeeze, Parabolic SAR)
+  const extraIndicators = safe(
+    () => calculateExtraIndicators(bars, technicals?.bbUpper, technicals?.bbLower),
+    null,
+  );
+  if (extraIndicators?.ttmSqueeze) {
+    rawSignals.push({
+      type: "TTM_SQUEEZE",
+      direction: "NEUTRAL",
+      strength: 75,
+      description: "TTM Squeeze: Bollinger bantları Keltner kanalının içine girdi. Çok güçlü kırılım hareketi bekleniyor.",
+    });
+  }
+
+  // 3e. Kalibrasyon (geçmiş doğruluğa göre güç ayarla)
+  const signals = accuracyMap
+    ? rawSignals.map((s) => ({
+        ...s,
+        strength: calibrateSignalStrength(s.strength, s.type, accuracyMap as Parameters<typeof calibrateSignalStrength>[2]),
+      }))
+    : rawSignals;
+
+  // 3f. Signal chains
+  let signalChainSignals: DetectedSignal[] = [];
+  try {
+    const chains = await detectSignalChains(code, signals);
+    signalChainSignals = chains.map((chain) => ({
+      type: `CHAIN_${chain.name}`,
+      direction: chain.direction,
+      strength: chain.strength,
+      description: `${chain.nameTr}: ${chain.description}`,
+    }));
+    signals.push(...signalChainSignals);
+  } catch { /* continue without chains */ }
 
   // 4. Fundamentals
   const fundScore = safe(
@@ -169,11 +226,7 @@ export async function analyzeStock(
     null,
   );
 
-  // 6. Extra indicators + combinations
-  const extraIndicators = safe(
-    () => calculateExtraIndicators(bars, technicals?.bbUpper, technicals?.bbLower),
-    null,
-  );
+  // 6. Signal combinations
   const signalCombination = safe(() => analyzeSignalCombinations(signals), null);
 
   // 7. Risk
@@ -194,7 +247,32 @@ export async function analyzeStock(
     } catch { /* continue without */ }
   }
 
-  // 9. Verdict
+  // 9. Signal backtest
+  let signalBacktest: VerdictInput["signalBacktest"] = null;
+  try {
+    const bt = await calculateBacktest(code);
+    if (bt?.performances?.length) {
+      signalBacktest = {
+        performances: bt.performances.map((p) => ({
+          signalType: p.signalType,
+          horizon1D: p.horizon1D,
+          bestHorizon: p.bestHorizon,
+          confidenceScore: p.confidenceScore,
+          streaks: p.streaks,
+        })),
+      };
+    }
+  } catch { /* continue without */ }
+
+  // 10. Signal accuracy record (for verdict)
+  const signalAccuracyRecord: Record<string, { rate: number; count: number }> = {};
+  if (accuracyMap) {
+    for (const [key, val] of accuracyMap) {
+      signalAccuracyRecord[key] = { rate: val.accuracyRate, count: val.totalCount };
+    }
+  }
+
+  // 11. Verdict (tam 3-pillar — daily analysis ile aynı)
   let verdict: Verdict | null = null;
   try {
     const verdictInput: VerdictInput = {
@@ -226,7 +304,7 @@ export async function analyzeStock(
         confluenceType: signalCombination.confluenceType,
         conflicting: signalCombination.conflicting,
       } : null,
-      signalAccuracy: {},
+      signalAccuracy: signalAccuracyRecord,
       multiTimeframe: multiTimeframe ? {
         weekly: { trend: multiTimeframe.weekly.trend },
         daily: { trend: multiTimeframe.daily.trend },
@@ -245,6 +323,8 @@ export async function analyzeStock(
         liquidityScore: riskMetrics.liquidityScore,
         stressTests: riskMetrics.stressTests,
       } : null,
+      sentimentValue: 0,
+      signalBacktest,
     };
     verdict = calculateVerdict(verdictInput);
   } catch { /* continue without verdict */ }
@@ -255,7 +335,7 @@ export async function analyzeStock(
 
   return {
     code,
-    name: quote?.shortName ?? quote?.longName ?? code,
+    name: quote?.name ?? code,
     price,
     changePercent,
     volume,
@@ -357,13 +437,15 @@ export async function analyzeStockIndex(
 ): Promise<ScreenerResult> {
   const stockList = STOCK_LISTS[index];
 
-  // 1. Macro data — once, shared across all stocks
-  const macroData = await getMacroData().catch(() => null);
+  // 1. Macro data + signal accuracy — once, shared across all stocks
+  const [macroData, accuracyMap] = await Promise.all([
+    getMacroData().catch(() => null),
+    getSignalAccuracyMap().catch(() => new Map()),
+  ]);
   const regime = detectVolatilityRegime(macroData);
 
   // 2. Analyze all stocks with concurrency control
-  // BIST100 has more stocks → keep concurrency at 5 but let stagger handle rate limiting
-  const tasks = stockList.map(code => () => analyzeStock(code, macroData, timeframe));
+  const tasks = stockList.map(code => () => analyzeStock(code, macroData, timeframe, accuracyMap as Parameters<typeof analyzeStock>[3]));
   const results = await runWithConcurrency(tasks, 5, 500);
 
   const stocks = results.filter((r): r is ScreenerStockResult => r !== null);

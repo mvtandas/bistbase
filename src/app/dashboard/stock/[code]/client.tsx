@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { SpkDisclaimer } from "@/components/shared/spk-disclaimer";
 import { ArrowLeft, AlertTriangle, BarChart3, Sparkles, Activity, DollarSign, Shield } from "lucide-react";
 import Link from "next/link";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 import type { StockDetail, Summary, Period, ContentTab } from "@/components/stock-detail/types";
 import { PERIOD_LABELS } from "@/components/stock-detail/types";
@@ -35,15 +36,36 @@ async function fetchInsight<T>(stockCode: string, type: string): Promise<T> {
   return json.data as T;
 }
 
+// AI query configs per tab — used for prefetch on hover
+// "batch" type uses the batch endpoint instead of individual fetchInsight calls
+const AI_QUERIES_BY_TAB: Record<string, { key: string; type: string; batch?: boolean }[]> = {
+  summary: [
+    { key: "ai-akilli-ozet", type: "akilli-ozet" },
+    { key: "ai-giris-cikis", type: "giris-cikis" },
+  ],
+  technical: [
+    { key: "ai-technical-batch", type: "technical-batch", batch: true },
+  ],
+  fundamental: [
+    { key: "ai-sektor-analiz", type: "sektor-analiz" },
+  ],
+  risk: [
+    { key: "ai-risk-senaryo", type: "risk-senaryo" },
+  ],
+};
+
 export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }: { stockCode: string; summaries: Summary[]; aiDisclaimerAccepted: boolean }) {
   const [period, setPeriod] = useState<Period>("today");
   const [tab, setTab] = useState<ContentTab>("summary");
   const [disclaimerShown, setDisclaimerShown] = useState(!aiDisclaimerAccepted);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(aiDisclaimerAccepted);
   const [editStock, setEditStock] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  // Main stock data
-  const { data, isLoading, isError, error, refetch } = useQuery<StockDetail>({
+  const pollingInterval = useMarketPollingInterval();
+
+  // 1. Critical stock data (fast — hero + chart + basic technicals)
+  const { data: criticalData, isLoading, isError, error, refetch } = useQuery<StockDetail>({
     queryKey: ["stock-detail", stockCode],
     queryFn: async () => {
       const r = await fetch(`/api/stock-detail/${stockCode}`);
@@ -53,7 +75,31 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
       return json;
     },
     retry: 2,
+    staleTime: pollingInterval,
+    refetchInterval: pollingInterval,
   });
+
+  // 2. Extended stock data (heavy — patterns, risk, backtest, etc.)
+  const { data: extendedData } = useQuery<Partial<StockDetail>>({
+    queryKey: ["stock-detail-extended", stockCode],
+    queryFn: async () => {
+      const r = await fetch(`/api/stock-detail/${stockCode}/extended`);
+      if (!r.ok) throw new Error("Detay verisi alınamadı");
+      const json = await r.json();
+      if (json.error) throw new Error(json.error);
+      return json;
+    },
+    enabled: !!criticalData,
+    retry: 1,
+    staleTime: 3 * 60 * 1000,
+  });
+
+  // Merge critical + extended into a single data object
+  const data = useMemo(() => {
+    if (!criticalData) return undefined;
+    if (!extendedData) return criticalData;
+    return { ...criticalData, ...extendedData } as StockDetail;
+  }, [criticalData, extendedData]);
 
   // Period data (week/month)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,7 +125,7 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
   const { data: akilliOzet, isLoading: aoLoading, isError: aoError } = useQuery<AkilliOzetOutput>({
     queryKey: ["ai-akilli-ozet", stockCode],
     queryFn: () => fetchInsight<AkilliOzetOutput>(stockCode, "akilli-ozet"),
-    enabled: tab === "summary" && !!data,
+    enabled: tab === "summary" && !!criticalData,
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -87,39 +133,42 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
   const { data: girisCikis, isLoading: gcLoading, isError: gcError } = useQuery<GirisCikisOutput>({
     queryKey: ["ai-giris-cikis", stockCode],
     queryFn: () => fetchInsight<GirisCikisOutput>(stockCode, "giris-cikis"),
-    enabled: tab === "summary" && !!data,
+    enabled: tab === "summary" && !!criticalData,
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: teknikYorum, isLoading: tyLoading, isError: tyError } = useQuery<TeknikYorumOutput>({
-    queryKey: ["ai-teknik-yorum", stockCode],
-    queryFn: () => fetchInsight<TeknikYorumOutput>(stockCode, "teknik-yorum"),
-    enabled: tab === "technical" && !!data,
+  // Technical tab — single batch query instead of 3 separate calls
+  interface TechnicalBatchResult {
+    teknikYorum: { cached: boolean; data: TeknikYorumOutput | null };
+    sinyalCozum: { cached: boolean; data: SinyalCozumOutput | null };
+    islemKurulumu: { cached: boolean; data: IslemKurulumuOutput | null };
+  }
+  const { data: techBatch, isLoading: techBatchLoading, isError: techBatchError } = useQuery<TechnicalBatchResult>({
+    queryKey: ["ai-technical-batch", stockCode],
+    queryFn: async () => {
+      const r = await fetch(`/api/stock-detail/${stockCode}/ai/technical-batch`);
+      if (!r.ok) throw new Error("Teknik AI analizi yüklenemedi");
+      return r.json();
+    },
+    enabled: tab === "technical" && !!criticalData,
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
-
-  const { data: sinyalCozum, isLoading: scLoading, isError: scError } = useQuery<SinyalCozumOutput>({
-    queryKey: ["ai-sinyal-cozum", stockCode],
-    queryFn: () => fetchInsight<SinyalCozumOutput>(stockCode, "sinyal-cozum"),
-    enabled: tab === "technical" && !!data,
-    retry: 1,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: islemKurulumu, isLoading: ikLoading, isError: ikError } = useQuery<IslemKurulumuOutput>({
-    queryKey: ["ai-islem-kurulumu", stockCode],
-    queryFn: () => fetchInsight<IslemKurulumuOutput>(stockCode, "islem-kurulumu"),
-    enabled: tab === "technical" && !!data,
-    retry: 1,
-    staleTime: 5 * 60 * 1000,
-  });
+  const teknikYorum = techBatch?.teknikYorum?.data ?? undefined;
+  const tyLoading = techBatchLoading;
+  const tyError = techBatchError;
+  const sinyalCozum = techBatch?.sinyalCozum?.data ?? undefined;
+  const scLoading = techBatchLoading;
+  const scError = techBatchError;
+  const islemKurulumu = techBatch?.islemKurulumu?.data ?? undefined;
+  const ikLoading = techBatchLoading;
+  const ikError = techBatchError;
 
   const { data: riskSenaryo, isLoading: rsLoading, isError: rsError } = useQuery<RiskSenaryoOutput>({
     queryKey: ["ai-risk-senaryo", stockCode],
     queryFn: () => fetchInsight<RiskSenaryoOutput>(stockCode, "risk-senaryo"),
-    enabled: tab === "risk" && !!data,
+    enabled: tab === "risk" && !!criticalData,
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -127,10 +176,36 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
   const { data: sektorAnaliz, isLoading: saLoading, isError: saError } = useQuery<SektorAnalizOutput>({
     queryKey: ["ai-sektor-analiz", stockCode],
     queryFn: () => fetchInsight<SektorAnalizOutput>(stockCode, "sektor-analiz"),
-    enabled: tab === "fundamental" && !!data,
+    enabled: tab === "fundamental" && !!criticalData,
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Prefetch AI insights on tab hover
+  const prefetchTab = useCallback((tabKey: string) => {
+    if (!criticalData) return;
+    const queries = AI_QUERIES_BY_TAB[tabKey];
+    if (!queries) return;
+    for (const q of queries) {
+      if (q.batch) {
+        queryClient.prefetchQuery({
+          queryKey: [q.key, stockCode],
+          queryFn: async () => {
+            const r = await fetch(`/api/stock-detail/${stockCode}/ai/${q.type}`);
+            if (!r.ok) throw new Error("AI analizi yüklenemedi");
+            return r.json();
+          },
+          staleTime: 5 * 60 * 1000,
+        });
+      } else {
+        queryClient.prefetchQuery({
+          queryKey: [q.key, stockCode],
+          queryFn: () => fetchInsight(stockCode, q.type),
+          staleTime: 5 * 60 * 1000,
+        });
+      }
+    }
+  }, [criticalData, stockCode, queryClient]);
 
   // Disclaimer modal: show on first AI load if not yet accepted
   const showDisclaimer = disclaimerShown && !disclaimerAccepted;
@@ -211,6 +286,7 @@ export function StockDetailClient({ stockCode, summaries, aiDisclaimerAccepted }
                     <button
                       key={t.key}
                       onClick={() => setTab(t.key)}
+                      onMouseEnter={() => prefetchTab(t.key)}
                       className={cn(
                         "flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-all",
                         isActive

@@ -483,7 +483,24 @@ model PaperEquitySnapshot {
   @@index([accountId, date])
 }
 
-// ---- v7: Backtest Reports ----
+// ---- v7: Verdict Snapshots (gün içi değişim geçmişi) ----
+
+model VerdictSnapshot {
+  id             String   @id @default(cuid())
+  stockCode      String
+  date           DateTime @db.Date
+  hour           Int      // 10, 11, 12, ... 17 (İstanbul saati)
+  verdictAction  String   // GUCLU_AL, AL, TUT, SAT, GUCLU_SAT
+  verdictScore   Float    // -1.0 to +1.0
+  compositeScore Float?
+  price          Float?
+  createdAt      DateTime @default(now())
+
+  @@unique([stockCode, date, hour])
+  @@index([stockCode, date])
+}
+
+// ---- v8: Backtest Reports ----
 
 model BacktestReport {
   id                  String   @id @default(cuid())

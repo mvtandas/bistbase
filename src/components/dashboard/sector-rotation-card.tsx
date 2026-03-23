@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface SectorRotationData {
   sector: string;
@@ -14,6 +15,7 @@ interface SectorRotationData {
 }
 
 export function SectorRotationCard() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading } = useQuery<SectorRotationData[]>({
     queryKey: ["sector-rotation"],
     queryFn: async () => {
@@ -21,7 +23,7 @@ export function SectorRotationCard() {
       if (!r.ok) return [];
       return r.json();
     },
-    refetchInterval: 10 * 60 * 1000,
+    refetchInterval: pollingInterval * 2,
   });
 
   if (isLoading) {

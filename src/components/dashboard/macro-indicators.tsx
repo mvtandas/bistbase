@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Globe, TrendingUp, TrendingDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface MacroData {
   usdTry: number | null;
@@ -41,11 +42,12 @@ function formatValue(value: number | null, format: string): string {
 }
 
 export function MacroIndicators() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading, isError } = useQuery<MacroData>({
     queryKey: ["macro"],
     queryFn: () => fetch("/api/macro").then((r) => r.json()),
-    staleTime: 10 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
+    staleTime: pollingInterval * 2,
+    refetchInterval: pollingInterval * 2,
   });
 
   if (isLoading) {

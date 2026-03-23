@@ -6,13 +6,19 @@ import type { MarketSummary } from "@/lib/stock/batch-analysis";
 import type { MacroData } from "@/lib/stock/macro";
 import type { VolatilityRegime } from "@/lib/stock/scoring";
 
+const INDEX_LABELS: Record<string, string> = {
+  bist30: "BİST30", bist50: "BİST50", bist100: "BİST100",
+  bistall: "Tüm BİST", xtm25: "Temettü 25", xkury: "Kurumsal", xusrd: "Sürdürülebilir",
+};
+
 interface MarketSummaryCardsProps {
   summary: MarketSummary;
   regime: VolatilityRegime;
   macroData: MacroData | null;
+  index?: string;
 }
 
-export function MarketSummaryCards({ summary, regime, macroData }: MarketSummaryCardsProps) {
+export function MarketSummaryCards({ summary, regime, macroData, index = "bist30" }: MarketSummaryCardsProps) {
   const totalVerdicts = summary.strongBuyCount + summary.buyCount + summary.holdCount + summary.sellCount + summary.strongSellCount;
   const buyPercent = totalVerdicts > 0 ? ((summary.strongBuyCount + summary.buyCount) / totalVerdicts) * 100 : 0;
   const sellPercent = totalVerdicts > 0 ? ((summary.sellCount + summary.strongSellCount) / totalVerdicts) * 100 : 0;
@@ -36,7 +42,7 @@ export function MarketSummaryCards({ summary, regime, macroData }: MarketSummary
           )}>
             {Math.round(summary.avgComposite)}
           </p>
-          <p className="text-[10px] text-muted-foreground/50 mt-1">BİST30 ortalama</p>
+          <p className="text-[10px] text-muted-foreground/50 mt-1">{INDEX_LABELS[index] ?? index} ortalama</p>
         </div>
       </div>
 

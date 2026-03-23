@@ -11,6 +11,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 import Link from "next/link";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface IndexData {
   name: string;
@@ -67,10 +68,11 @@ function ChangeIndicator({
 }
 
 export function MarketOverview() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading } = useQuery({
     queryKey: ["market-overview"],
     queryFn: fetchMarket,
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

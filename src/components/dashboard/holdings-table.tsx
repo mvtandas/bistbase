@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { ArrowUpDown, TrendingUp, TrendingDown, Minus, Pencil, Trash2, Plus, Search, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioCore } from "@/hooks/use-portfolio-data";
 import { Sparkline } from "./sparkline";
 import { HoldingsEmptyState } from "./holdings-empty-state";
 import Link from "next/link";
@@ -39,12 +38,7 @@ interface HoldingsTableProps {
 }
 
 export function HoldingsTable({ onEdit, onAdd, onRemove }: HoldingsTableProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading, isError } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data, isLoading, isError } = usePortfolioCore();
 
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "compositeScore", desc: true });
   const [search, setSearch] = useState("");

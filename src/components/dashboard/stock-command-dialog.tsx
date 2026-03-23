@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useStockSearch } from "@/hooks/use-stock-search";
 import { useAddStock } from "@/hooks/use-portfolio-mutations";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioCore } from "@/hooks/use-portfolio-data";
 import { Loader2, Plus, TrendingUp } from "lucide-react";
 import {
   Command,
@@ -43,11 +42,7 @@ export function StockCommandDialog({ open, onOpenChange, onStockAdded }: StockCo
   const addStock = useAddStock();
 
   // Fetch current portfolio to mark already-added stocks
-  const { data: portfolioData } = useQuery<{ holdings?: { stockCode: string }[] }>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: portfolioData } = usePortfolioCore();
 
   const portfolioCodes = useMemo(() => {
     const codes = new Set<string>();

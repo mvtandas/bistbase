@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/analyze",
-      "schedule": "0 18 * * 1-5"
-    },
-    {
       "path": "/api/cron/track-signals",
       "schedule": "30 18 * * 1-5"
     },
@@ -29,12 +25,24 @@
       "schedule": "0 17 * * 1-5"
     },
     {
-      "path": "/api/cron/screener-analysis",
-      "schedule": "0 7,12,17 * * 1-5"
+      "path": "/api/cron/intraday-scan",
+      "schedule": "*/15 7-15 * * 1-5"
     },
     {
-      "path": "/api/cron/paper-trade",
-      "schedule": "15 18 * * 1-5"
+      "path": "/api/cron/intraday-scan?partition=1",
+      "schedule": "0 7,12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/intraday-scan?partition=2",
+      "schedule": "2 7,12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/intraday-scan?partition=3",
+      "schedule": "4 7,12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/intraday-scan?partition=4",
+      "schedule": "6 7,12 * * 1-5"
     }
   ]
 }

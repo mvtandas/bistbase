@@ -20,6 +20,12 @@ import { calculateBacktest } from "@/lib/stock/backtest";
 import { filterSignals } from "@/lib/stock/signal-filter";
 import { BIST30 } from "@/lib/constants";
 import { getIstanbulToday, toIstanbulDateUTC } from "@/lib/date-utils";
+import { getCachedInsight, saveInsight } from "@/lib/ai/insight-cache";
+import { buildAkilliOzetPrompt, buildTeknikYorumPrompt } from "@/lib/ai/specialized-prompts";
+import { AkilliOzetSchema, TeknikYorumSchema } from "@/lib/ai/schemas";
+import { generateSpecializedInsightWithSchema } from "@/lib/ai/specialized";
+import { getPromptVersion } from "@/lib/ai/prompt-registry";
+import { analyzeSeasonality } from "@/lib/stock/seasonality";
 
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -402,6 +408,53 @@ export async function runDailyAnalysis(): Promise<{
         });
 
         processed++;
+
+        // ── STEP 10: Pre-generate AI insights (akilli-ozet + teknik-yorum) ──
+        try {
+          const seasonality = bars.length > 60 ? analyzeSeasonality(bars) : null;
+
+          // akilli-ozet
+          const aoCached = await getCachedInsight(stockCode, "akilli-ozet", today);
+          if (!aoCached) {
+            const aoPrompt = buildAkilliOzetPrompt({
+              stockCode, price, changePercent,
+              compositeScore: finalScore, signals, riskMetrics,
+              macroData, seasonality, fundamentalScore: fundScore,
+            });
+            const aoResult = await generateSpecializedInsightWithSchema(aoPrompt.system, aoPrompt.user, AkilliOzetSchema);
+            if (aoResult) {
+              await saveInsight(stockCode, "akilli-ozet", today, aoResult as object, "daily", { promptVersion: getPromptVersion("akilli-ozet") });
+              console.log(`[analyze] Pre-generated akilli-ozet for ${stockCode}`);
+            }
+            await sleep(2000);
+          }
+
+          // teknik-yorum
+          const tyCached = await getCachedInsight(stockCode, "teknik-yorum", today);
+          if (!tyCached) {
+            const tyPrompt = buildTeknikYorumPrompt({
+              stockCode, price,
+              candlestickPatterns: candlesticks,
+              chartPatterns,
+              technicals,
+              signalChains,
+              signalCombination: analyzeSignalCombinations(signals),
+              multiTimeframe: bars.length > 0 && technicals
+                ? await analyzeMultiTimeframe(stockCode, bars, { rsi14: technicals.rsi14, maAlignment: technicals.maAlignment }).catch(() => null)
+                : null,
+            });
+            const tyResult = await generateSpecializedInsightWithSchema(tyPrompt.system, tyPrompt.user, TeknikYorumSchema, { maxTokens: 1200 });
+            if (tyResult) {
+              await saveInsight(stockCode, "teknik-yorum", today, tyResult as object, "daily", { promptVersion: getPromptVersion("teknik-yorum") });
+              console.log(`[analyze] Pre-generated teknik-yorum for ${stockCode}`);
+            }
+            await sleep(2000);
+          }
+        } catch (insightErr) {
+          console.warn(`[analyze] AI insight pre-generation failed for ${stockCode}:`, insightErr);
+          // Non-fatal — main analysis already succeeded
+        }
+
       } else {
         await prisma.dailySummary.update({
           where: { stockCode_date_timeframe: { stockCode, date: today, timeframe: "daily" } },

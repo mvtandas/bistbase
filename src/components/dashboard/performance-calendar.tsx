@@ -1,10 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioAnalytics } from "@/hooks/use-portfolio-data";
 
 function getReturnColor(value: number): string {
   if (value >= 2) return "bg-gain/80";
@@ -17,12 +16,7 @@ function getReturnColor(value: number): string {
 }
 
 export function PerformanceCalendar() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data, isLoading } = usePortfolioAnalytics();
 
   if (isLoading) {
     return (

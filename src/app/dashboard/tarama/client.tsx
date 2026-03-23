@@ -166,7 +166,7 @@ export function ScreenerClient() {
       {data && stocks.length > 0 && <BestOpportunities stocks={stocks} />}
 
       {/* Market Summary */}
-      {data && stocks.length > 0 && <MarketSummaryCards summary={data.marketSummary} regime={data.regime} macroData={data.macroData} />}
+      {data && stocks.length > 0 && <MarketSummaryCards summary={data.marketSummary} regime={data.regime} macroData={data.macroData} index={index} />}
 
       {/* Sector Heatmap */}
       {data && stocks.length > 0 && <SectorHeatmap sectorSummary={data.sectorSummary} />}

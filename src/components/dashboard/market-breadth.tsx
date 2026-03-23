@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { BarChart3 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface BreadthData {
   breadth: {
@@ -24,11 +25,12 @@ function formatVolume(v: number): string {
 }
 
 export function MarketBreadth() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading } = useQuery<BreadthData>({
     queryKey: ["market-overview"],
     queryFn: () => fetch("/api/market-overview").then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: pollingInterval,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/lib/constants";
+import { PORTFOLIO_QUERY_KEYS } from "@/hooks/use-portfolio-data";
 import { toast } from "sonner";
 
 // All portfolio-related query keys to invalidate after mutations
@@ -15,8 +16,22 @@ const PORTFOLIO_KEYS = [
   QUERY_KEYS.PORTFOLIO,
 ] as const;
 
+// Tiered query keys (new architecture)
+const TIERED_KEYS = [
+  PORTFOLIO_QUERY_KEYS.core("daily"),
+  PORTFOLIO_QUERY_KEYS.core("weekly"),
+  PORTFOLIO_QUERY_KEYS.core("monthly"),
+  PORTFOLIO_QUERY_KEYS.analytics("daily"),
+  PORTFOLIO_QUERY_KEYS.analytics("weekly"),
+  PORTFOLIO_QUERY_KEYS.analytics("monthly"),
+  PORTFOLIO_QUERY_KEYS.simulations(),
+] as const;
+
 function invalidateAll(queryClient: ReturnType<typeof useQueryClient>) {
   for (const key of PORTFOLIO_KEYS) {
+    queryClient.invalidateQueries({ queryKey: key });
+  }
+  for (const key of TIERED_KEYS) {
     queryClient.invalidateQueries({ queryKey: key });
   }
 }
@@ -42,16 +57,18 @@ export function useAddStock() {
 
     onMutate: async (stockCode) => {
       // Cancel outgoing refetches
+      const coreKey = PORTFOLIO_QUERY_KEYS.core("daily");
+      await queryClient.cancelQueries({ queryKey: coreKey });
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE });
 
       // Snapshot previous value
-      const previous = queryClient.getQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE);
+      const previousCore = queryClient.getQueryData(coreKey);
+      const previousLegacy = queryClient.getQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE);
 
-      // Optimistically add stub holding
+      // Optimistic update helper
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, (old: any) => {
+      const optimisticAdd = (old: any) => {
         if (!old?.holdings) return old;
-        // Don't add if already exists
         if (old.holdings.some((h: { stockCode: string }) => h.stockCode === stockCode)) return old;
         return {
           ...old,
@@ -74,15 +91,22 @@ export function useAddStock() {
             },
           ],
         };
-      });
+      };
 
-      return { previous };
+      queryClient.setQueryData(coreKey, optimisticAdd);
+      queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, optimisticAdd);
+
+      return { previousCore, previousLegacy };
     },
 
     onError: (_err, _stockCode, context) => {
       // Rollback
-      if (context?.previous) {
-        queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, context.previous);
+      const coreKey = PORTFOLIO_QUERY_KEYS.core("daily");
+      if (context?.previousCore) {
+        queryClient.setQueryData(coreKey, context.previousCore);
+      }
+      if (context?.previousLegacy) {
+        queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, context.previousLegacy);
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,26 +148,36 @@ export function useRemoveStock() {
     },
 
     onMutate: async (stockCode) => {
+      const coreKey = PORTFOLIO_QUERY_KEYS.core("daily");
+      await queryClient.cancelQueries({ queryKey: coreKey });
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE });
 
-      const previous = queryClient.getQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE);
+      const previousCore = queryClient.getQueryData(coreKey);
+      const previousLegacy = queryClient.getQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE);
 
       // Optimistically remove
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, (old: any) => {
+      const optimisticRemove = (old: any) => {
         if (!old?.holdings) return old;
         return {
           ...old,
           holdings: old.holdings.filter((h: { stockCode: string }) => h.stockCode !== stockCode),
         };
-      });
+      };
 
-      return { previous };
+      queryClient.setQueryData(coreKey, optimisticRemove);
+      queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, optimisticRemove);
+
+      return { previousCore, previousLegacy };
     },
 
     onError: (_err, _stockCode, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, context.previous);
+      const coreKey = PORTFOLIO_QUERY_KEYS.core("daily");
+      if (context?.previousCore) {
+        queryClient.setQueryData(coreKey, context.previousCore);
+      }
+      if (context?.previousLegacy) {
+        queryClient.setQueryData(QUERY_KEYS.PORTFOLIO_INTELLIGENCE, context.previousLegacy);
       }
       toast.error("Hisse çıkarılırken bir hata oluştu.");
     },

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScoreGauge } from "./score-gauge";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface SentimentData {
   avgScore: number;
@@ -22,11 +23,12 @@ const VERDICT_COLORS: Record<string, { bg: string; text: string; label: string }
 };
 
 export function MarketSentiment() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading } = useQuery<SentimentData>({
     queryKey: ["market-sentiment"],
     queryFn: () => fetch("/api/market-sentiment").then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: pollingInterval,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

@@ -101,6 +101,28 @@ export async function cacheThrough<T>(
   return result;
 }
 
+/**
+ * Stale-While-Revalidate cache read.
+ * Returns data immediately even if nearing expiry, with a `stale` flag
+ * so the caller can trigger background recomputation.
+ */
+export async function cacheGetSWR<T>(key: string, staleTTLThreshold = 60): Promise<{ data: T; stale: boolean } | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    const [data, ttl] = await Promise.all([
+      redis.get<T>(key),
+      redis.ttl(key),
+    ]);
+    if (data == null) return null;
+    return { data, stale: ttl > 0 && ttl < staleTTLThreshold };
+  } catch (err) {
+    console.error("[redis] SWR GET error:", (err as Error).message);
+    return null;
+  }
+}
+
 /** Check if Redis is configured and available */
 export function isRedisAvailable(): boolean {
   return getRedis() !== null;

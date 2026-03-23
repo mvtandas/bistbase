@@ -1,10 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, BarChart3, AlertCircle, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioAnalytics } from "@/hooks/use-portfolio-data";
 
 interface BenchmarkData {
   period: string;
@@ -17,12 +16,7 @@ interface BenchmarkData {
 }
 
 export function PortfolioBenchmark() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading, error, refetch } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data, isLoading, error, refetch } = usePortfolioAnalytics();
 
   if (isLoading) return <div className="bento-card"><div className="bento-card-body"><Skeleton className="h-40 w-full" /></div></div>;
 

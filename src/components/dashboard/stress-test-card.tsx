@@ -1,10 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Zap, Shield } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioSimulations } from "@/hooks/use-portfolio-data";
 
 const SEVERITY_CONFIG = {
   LOW: { bg: "bg-gain/10", text: "text-gain", label: "Düşük" },
@@ -14,12 +13,8 @@ const SEVERITY_CONFIG = {
 };
 
 export function StressTestCard() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  // Only fetches when this component is mounted (risk tab active)
+  const { data, isLoading } = usePortfolioSimulations(true);
 
   if (isLoading) {
     return (

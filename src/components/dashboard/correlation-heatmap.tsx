@@ -1,10 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Grid3X3 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioAnalytics } from "@/hooks/use-portfolio-data";
 
 function getCorrelationColor(value: number): string {
   const abs = Math.abs(value);
@@ -16,12 +15,7 @@ function getCorrelationColor(value: number): string {
 }
 
 export function CorrelationHeatmap() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data, isLoading } = usePortfolioAnalytics();
 
   if (isLoading) {
     return (

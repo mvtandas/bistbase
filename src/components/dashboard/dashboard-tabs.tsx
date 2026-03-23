@@ -1,26 +1,64 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { PieChart, ShieldAlert, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Allocation tab — default, loaded eagerly
 import { AllocationChart } from "./allocation-chart";
-import { PortfolioBenchmark } from "./portfolio-benchmark";
-import { PerformanceCalendar } from "./performance-calendar";
-import { RiskMetricsSummary } from "./risk-metrics-summary";
-import { RiskContribution } from "./risk-contribution";
-import { PortfolioAttribution } from "./portfolio-attribution";
-import { PortfolioDrawdown } from "./portfolio-drawdown";
-import { MonteCarloChart } from "./monte-carlo-chart";
-import { StressTestCard } from "./stress-test-card";
-import { CorrelationHeatmap } from "./correlation-heatmap";
-import { WhatIfPanel } from "./what-if-panel";
-import { PortfolioRiskCard } from "./portfolio-risk-card";
-import { SectorRotationCard } from "./sector-rotation-card";
-import { RebalanceSuggestions } from "./rebalance-suggestions";
 import { PortfolioOzetCard } from "./ai/portfolio-ozet-card";
 import { PortfolioPerformansCard } from "./ai/portfolio-performans-card";
-import { PortfolioRiskAiCard } from "./ai/portfolio-risk-ai-card";
-import { PortfolioRebalansCard } from "./ai/portfolio-rebalans-card";
+
+// Risk tab — loaded lazily
+const PortfolioBenchmark = dynamic(() => import("./portfolio-benchmark").then(m => ({ default: m.PortfolioBenchmark })), {
+  loading: () => <Skeleton className="h-[300px] w-full rounded-2xl" />,
+});
+const PerformanceCalendar = dynamic(() => import("./performance-calendar").then(m => ({ default: m.PerformanceCalendar })), {
+  loading: () => <Skeleton className="h-[300px] w-full rounded-2xl" />,
+});
+const RiskMetricsSummary = dynamic(() => import("./risk-metrics-summary").then(m => ({ default: m.RiskMetricsSummary })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const RiskContribution = dynamic(() => import("./risk-contribution").then(m => ({ default: m.RiskContribution })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const PortfolioAttribution = dynamic(() => import("./portfolio-attribution").then(m => ({ default: m.PortfolioAttribution })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const PortfolioDrawdown = dynamic(() => import("./portfolio-drawdown").then(m => ({ default: m.PortfolioDrawdown })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const MonteCarloChart = dynamic(() => import("./monte-carlo-chart").then(m => ({ default: m.MonteCarloChart })), {
+  loading: () => <Skeleton className="h-[300px] w-full rounded-2xl" />,
+});
+const StressTestCard = dynamic(() => import("./stress-test-card").then(m => ({ default: m.StressTestCard })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const CorrelationHeatmap = dynamic(() => import("./correlation-heatmap").then(m => ({ default: m.CorrelationHeatmap })), {
+  loading: () => <Skeleton className="h-[300px] w-full rounded-2xl" />,
+});
+const PortfolioRiskAiCard = dynamic(() => import("./ai/portfolio-risk-ai-card").then(m => ({ default: m.PortfolioRiskAiCard })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+
+// Tools tab — loaded lazily
+const WhatIfPanel = dynamic(() => import("./what-if-panel").then(m => ({ default: m.WhatIfPanel })), {
+  loading: () => <Skeleton className="h-[300px] w-full rounded-2xl" />,
+});
+const PortfolioRiskCard = dynamic(() => import("./portfolio-risk-card").then(m => ({ default: m.PortfolioRiskCard })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const SectorRotationCard = dynamic(() => import("./sector-rotation-card").then(m => ({ default: m.SectorRotationCard })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const RebalanceSuggestions = dynamic(() => import("./rebalance-suggestions").then(m => ({ default: m.RebalanceSuggestions })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
+const PortfolioRebalansCard = dynamic(() => import("./ai/portfolio-rebalans-card").then(m => ({ default: m.PortfolioRebalansCard })), {
+  loading: () => <Skeleton className="h-[200px] w-full rounded-2xl" />,
+});
 
 type Tab = "allocation" | "risk" | "tools";
 

@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { PieChart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioCore } from "@/hooks/use-portfolio-data";
 
 const COLORS = ["#818cf8", "#34d399", "#fbbf24", "#fb7185", "#a78bfa", "#22d3ee", "#f97316", "#f472b6", "#6ee7b7", "#fcd34d"];
 
@@ -94,12 +93,7 @@ type ViewMode = "hisse" | "sektor";
 export function AllocationChart() {
   const [view, setView] = useState<ViewMode>("hisse");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data, isLoading } = usePortfolioCore();
 
   if (isLoading) {
     return (

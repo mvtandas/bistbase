@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { MobileHeader } from "@/components/dashboard/mobile-header";
+import { PriceStreamProvider } from "@/components/dashboard/price-stream-provider";
 
 export default async function DashboardLayout({
   children,
@@ -47,6 +48,7 @@ export default async function DashboardLayout({
         />
       </div>
 
+      <PriceStreamProvider />
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 md:py-8">
           {children}

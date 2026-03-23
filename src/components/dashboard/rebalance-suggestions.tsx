@@ -1,11 +1,10 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Scale, TrendingDown, TrendingUp, AlertTriangle, Shield, Layers } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QUERY_KEYS } from "@/lib/constants";
+import { usePortfolioCore } from "@/hooks/use-portfolio-data";
 
 interface Holding {
   stockCode: string;
@@ -128,12 +127,7 @@ function deriveActions(holdings: Holding[], suggestions: Suggestion[]): Rebalanc
 }
 
 export function RebalanceSuggestions() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, isLoading } = useQuery<any>({
-    queryKey: QUERY_KEYS.PORTFOLIO_INTELLIGENCE,
-    queryFn: () => fetch("/api/portfolio-intelligence").then((r) => r.json()),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data, isLoading } = usePortfolioCore();
 
   const actions = useMemo(() => {
     if (!data?.holdings) return [];

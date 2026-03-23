@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Shield, AlertTriangle } from "lucide-react";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface PortfolioRiskData {
   highCorrelationWarnings: string[];
@@ -14,6 +15,7 @@ interface PortfolioRiskData {
 }
 
 export function PortfolioRiskCard() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading } = useQuery<PortfolioRiskData>({
     queryKey: ["portfolio-risk"],
     queryFn: async () => {
@@ -21,7 +23,7 @@ export function PortfolioRiskCard() {
       if (!r.ok) return null;
       return r.json();
     },
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: pollingInterval * 2, // risk verisi daha az sık yeterli
   });
 
   if (isLoading) {

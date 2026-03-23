@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Newspaper, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMarketPollingInterval } from "@/hooks/use-market-polling";
 
 interface NewsItem {
   stockCode: string;
@@ -10,11 +11,12 @@ interface NewsItem {
 }
 
 export function NewsFeed() {
+  const pollingInterval = useMarketPollingInterval();
   const { data, isLoading, refetch, isFetching } = useQuery<{ news: NewsItem[] }>({
     queryKey: ["portfolio-news"],
     queryFn: () => fetch("/api/portfolio-news").then((r) => r.json()),
-    staleTime: 10 * 60 * 1000,
-    refetchInterval: 10 * 60 * 1000,
+    staleTime: pollingInterval * 4, // haberler daha az sık yeterli
+    refetchInterval: pollingInterval * 4,
   });
 
   if (isLoading) {
